@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { canonical, ErrorCanonico } from "@/server/crypto/canonical";
-import { ErrorApi, errorEsperado, type RespuestaJson } from "@/server/http/respuestas";
+import { comoResponse, ErrorApi, errorEsperado, type RespuestaJson } from "@/server/http/respuestas";
 import { ejecutar, esDuplicado, query } from "@/server/mysql/pool";
 
 // Idempotency-Key obligatorio en todos los POST (F3.5).
@@ -33,9 +33,11 @@ export async function conIdempotencia(
   clave: string | null,
   ruta: string,
   cuerpo: unknown,
-  ejecutarSolicitud: () => Promise<RespuestaJson>,
+  ejecutarSolicitud: (key: string) => Promise<RespuestaJson>,
 ): Promise<ResultadoIdempotente> {
-  const key = idempotencyKey.parse(clave ?? undefined);
+  const k = idempotencyKey.safeParse(clave ?? undefined);
+  if (!k.success) throw new ErrorApi("VALIDACION", k.error.issues[0]?.message ?? "Idempotency-Key inválida", { campo: "Idempotency-Key" });
+  const key = k.data;
   const hash = huella(ruta, cuerpo);
 
   try {
@@ -57,7 +59,7 @@ export async function conIdempotencia(
 
   let resultado: RespuestaJson;
   try {
-    resultado = await ejecutarSolicitud();
+    resultado = await ejecutarSolicitud(key);
   } catch (e) {
     const esperado = errorEsperado(e);
     if (!esperado || esperado.status === 400) {
@@ -74,6 +76,28 @@ export async function conIdempotencia(
     [resultado.status, JSON.stringify(resultado.cuerpo), key],
   );
   return { ...resultado, repetida: false };
+}
+
+/**
+ * POST idempotente: lee el cuerpo JSON (vacío = null), aplica la Idempotency-Key y responde.
+ * `ruta` debe identificar el recurso (incluye los ids de la URL) para que la key no se reutilice entre rutas.
+ */
+export async function postIdempotente(
+  req: Request,
+  ruta: string,
+  manejar: (cuerpo: unknown, key: string) => Promise<RespuestaJson>,
+): Promise<Response> {
+  const texto = await req.text();
+  let cuerpo: unknown = null;
+  if (texto.trim()) {
+    try {
+      cuerpo = JSON.parse(texto);
+    } catch {
+      throw new ErrorApi("VALIDACION", "El cuerpo no es JSON válido");
+    }
+  }
+  const r = await conIdempotencia(req.headers.get("idempotency-key"), ruta, cuerpo, (key) => manejar(cuerpo, key));
+  return comoResponse(r, r.repetida ? { "Idempotent-Replayed": "true" } : undefined);
 }
 
 async function liberar(key: string) {
