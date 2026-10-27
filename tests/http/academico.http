@@ -1,0 +1,57 @@
+### API de consulta académica (extensión REST Client de VS Code)
+# 1. pnpm build && pnpm start   (o pnpm dev)
+# 2. Copie BENCH_TOKEN de .env en @token, o inicie sesión con el primer request.
+
+@base = http://localhost:3000/api/v1
+@token = PEGAR_BENCH_TOKEN
+
+### Iniciar sesión del operador (guarda la cookie ppi_sesion)
+POST {{base}}/autenticacion/sesion
+Content-Type: application/json
+
+{ "usuario": "operador", "password": "PEGAR_CLAVE" }
+
+### Sesión actual
+GET {{base}}/autenticacion/sesion
+
+### Cerrar sesión
+DELETE {{base}}/autenticacion/sesion
+
+### Resumen: conteos, años, fuentes y diferencias de control
+GET {{base}}/datos/resumen
+Authorization: Bearer {{token}}
+
+### Catálogo (opcional: ?anio=2026)
+GET {{base}}/academico/catalogo?anio=2026
+Authorization: Bearer {{token}}
+
+### Estudiantes matriculados en 2024
+GET {{base}}/academico/estudiantes?anio=2024&page=1&pageSize=50
+Authorization: Bearer {{token}}
+
+### Estudiantes de una sección (tome un seccionId del catálogo)
+GET {{base}}/academico/estudiantes?anio=2026&seccion=SEC-12DC982D61BBE4632F6E
+Authorization: Bearer {{token}}
+
+### Detalle de un estudiante
+GET {{base}}/academico/estudiantes/EST-F165F4A743AAFDA77995
+Authorization: Bearer {{token}}
+
+### Notas registradas del 1er bimestre 2026
+GET {{base}}/academico/calificaciones?anio=2026&periodo=PER-2026-1&registrada=true&pageSize=50
+Authorization: Bearer {{token}}
+
+### Celdas sin nota (valorFuente "-": se conserva tal cual)
+GET {{base}}/academico/calificaciones?registrada=false&pageSize=10
+Authorization: Bearer {{token}}
+
+### Asistencias de agosto 2025
+GET {{base}}/academico/asistencias?anio=2025&desde=2025-08-01&hasta=2025-08-31&pageSize=50
+Authorization: Bearer {{token}}
+
+### Error de validación (pageSize > 200)
+GET {{base}}/academico/asistencias?pageSize=500
+Authorization: Bearer {{token}}
+
+### Sin credenciales -> 401
+GET {{base}}/academico/catalogo

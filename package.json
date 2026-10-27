@@ -19,8 +19,8 @@
     "db:verify": "tsx --env-file=.env scripts/data/verificar-origen.ts",
     "db:migrate": "bash scripts/data/migrar-experimental.sh",
     "db:reset-exp": "bash scripts/data/reset-experimental.sh",
-    "test": "vitest run",
-    "test:int": "vitest run tests/integration",
+    "test": "vitest run --project unit",
+    "test:int": "next build && vitest run --project integration",
     "auth:hash": "tsx scripts/auth/hash-password.ts"
   },
   "dependencies": {
@@ -41,6 +41,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
+    "vite": "^8.3.5",
     "vitest": "^5.0.5"
   }
 }
