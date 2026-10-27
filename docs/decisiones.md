@@ -178,3 +178,23 @@ Formato: contexto, decisión y consecuencias. Una decisión no se edita: si camb
 - Dentro de la transacción se ejecuta `SELECT … FROM registro … FOR UPDATE` y se exige `version_actual = versionEsperada`. Si no coincide, responde 409 `VERSION_DESACTUALIZADA` con `versionActual`. `UNIQUE(registro_id, version)` actúa como respaldo.
 - Con cinco rectificaciones concurrentes sobre la misma versión, en las pruebas siempre gana una y las otras cuatro reciben 409.
 - Por exigencia de Next.js, `eventos/[id]` y `trazabilidad/[id]` comparten el nombre del segmento dinámico: `[id]` es el eventoId o el registroId según la ruta.
+
+---
+
+## ADR-015 · Alineación del protocolo experimental con el artículo presentado
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** transversal (F4 a F10)
+
+**Contexto.** Cuando el artículo presentado y `PLAN_DESARROLLO.md` difieren, manda el artículo. La matriz anterior del plan (TPS 10/50/100, workers 2/4/8, 15 s y 60 s, 180 corridas) no coincidía con él.
+
+**Decisión.**
+- **Cargas candidatas:** 5, 10, 25 y 50 escrituras/s. Las definitivas se fijan después del piloto, y ese cambio se documenta en un ADR nuevo.
+- **Protocolo:** calentamiento de 60 s, observación de 180 s, 5 repeticiones y orden A/B alternado.
+- **Herramientas:** Caliper para los TPS confirmados, la latencia de envío a confirmación y el éxito; JMeter, en corridas separadas, para la latencia de extremo a extremo de la API.
+- **Métricas:** media, p50 y p95, tasa de éxito, dispersión entre repeticiones, CPU y RAM, profundidad de la cola y tamaño del payload.
+- **Terminología:** el flujo `PENDIENTE` → anclaje → `CONFIRMADA` (ADR-010, F6) se llama **bandeja transaccional (outbox)** en toda la documentación. La operación `PENDIENTE` se escribe en la misma transacción de MySQL que el cambio académico, como pide el artículo. La profundidad de la cola es el número de operaciones `PENDIENTE` o `ENVIADA`.
+- **Modo A:** Fabric recibe eventos **sintéticos no identificables** con la misma estructura y el mismo tamaño que los reales. Ningún dato del conjunto, ni siquiera seudónimo, llega completo al ledger.
+
+**Pendiente de decisión del equipo.** El short paper (sección II.B, RQ3) compara contra una **línea base de solo base de datos** ("database-only baseline"), y la matriz solo compara A contra B. También indica que el evento anclado incluye el **rol del actor**, que no está entre los campos permitidos de `RegistrarEvidencia`. Ninguno de los dos se implementa sin una decisión explícita.
+
+**Consecuencias.** `PLAN_DESARROLLO.md` (secciones 1, F4.3, F5.2, F6.1 y F9) queda actualizado. La matriz candidata tiene 80 corridas.

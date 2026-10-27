@@ -29,7 +29,7 @@
 | Aplicación | **Next.js 16** con App Router, TypeScript estricto y Route Handlers en runtime Node.js | Mantiene el monolito modular que ya existe. |
 | Validación | `zod` | Sirve para los contratos de la API y la configuración. |
 | Pruebas | `vitest` para pruebas unitarias e integración, y `playwright` para e2e (opcional) | |
-| Benchmark | Hyperledger Caliper 0.6 con un conector HTTP propio | Mide el recorrido completo: API, MySQL y Fabric. |
+| Benchmark | Hyperledger Caliper 0.6 con un conector HTTP propio, y JMeter aparte | Caliper mide TPS confirmados, latencia de envío a confirmación y éxito. JMeter mide la latencia de extremo a extremo de la API (ADR-015). |
 | Gestor de paquetes | `pnpm` | Ya está fijado en el repositorio. |
 | Node.js | 22 LTS (en `.node-version`) | |
 
@@ -301,13 +301,13 @@ src/modules/academico/
 
 | Función | Comportamiento |
 |---|---|
-| `RegistrarEvidencia(evidenciaJSON)` | Falla si el `evidenciaId` ya existe (idempotencia) y valida que `prevId` exista cuando la versión es mayor a 1 |
-| `RegistrarEventoCompleto(eventoJSON)` | Para el modo A |
+| `RegistrarEvidencia(json)` | Modo B. Solo admite `evidenciaId`, `registroOpacoId`, `prevEvidenciaId`, `version`, `operacion`, `hmac` y `schemaVersion`; rechaza cualquier campo extra |
+| `RegistrarEventoCompleto(json)` | Modo A, con un evento **sintético**. Tamaño máximo configurable |
 | `ObtenerEvidencia(id)` | Lectura |
 | `HistorialRegistro(registroOpacoId)` | Por clave compuesta `registro~version` |
-| `Revocar(id, motivo)` | Agrega un evento de revocación sin borrar nada |
+| `Revocar(id, motivoCodigo)` | Agrega un evento de revocación sin borrar nada. El motivo es un código, nunca texto libre |
 
-  Validaciones: tamaño máximo, campos obligatorios y rechazo de campos no permitidos, por ejemplo cualquier nombre.
+  Reglas: si un ID ya existe con el mismo contenido, se devuelve lo existente (idempotente); si existe con otro contenido, es un error. Si `version > 1`, debe existir `prevEvidenciaId` con `version - 1` del mismo registro. La fecha es el timestamp de la transacción (`ctx.stub.getTxTimestamp()`), no la que manda el cliente. No se usan `Date.now()` ni `Math.random()`, para que el chaincode sea determinista entre peers.
 - [ ] F4.4 Pruebas del chaincode en `chaincode/test` con `fabric-shim` simulado o con un stub.
 - [ ] F4.5 Escribir `deploy-cc.sh` con la política de endorsement `AND(Org1.peer, Org2.peer)`. Debe ser **la misma para A y B**.
 - [ ] F4.6 Crear perfiles de conexión e identidades en `infra/fabric/connection-profiles/`, ignorados por git. Las rutas se toman de `.env` (solo del servidor).
@@ -319,7 +319,7 @@ src/modules/academico/
 ### F5: Estrategias A/B integradas
 
 - [ ] F5.1 Crear `src/server/fabric/gateway.ts`: conexión única reutilizable, `submitAsync`, espera de `getStatus()` (commit válido) y timeouts configurables.
-- [ ] F5.2 Crear `src/server/storage-strategies/estrategia-a.ts`: guarda el detalle temporal en MySQL, lo envía completo a Fabric y, al confirmarse, borra el temporal.
+- [ ] F5.2 Crear `src/server/storage-strategies/estrategia-a.ts`: guarda el detalle temporal en MySQL, lo envía completo a Fabric y, al confirmarse, borra el temporal. **En el modo A, lo que llega a Fabric es un evento SINTÉTICO no identificable**, con la misma estructura y el mismo tamaño que el real (ADR-015).
 - [ ] F5.3 Crear `src/server/storage-strategies/estrategia-b.ts`: guarda el detalle y la clave en MySQL, envía solo la evidencia con su HMAC y al confirmarse marca la operación.
 - [ ] F5.4 Crear `src/server/storage-strategies/index.ts`: elige la estrategia según `EXPERIMENT_STRATEGY`, que se fija al arrancar y no cambia durante una corrida.
 - [ ] F5.5 Escribir la verificación (`POST /api/v1/trazabilidad/:eventoId/verificar`):
@@ -334,7 +334,7 @@ src/modules/academico/
 
 ### F6: Consistencia y recuperación
 
-- [ ] F6.1 Seguir este orden: la operación se registra como `PENDIENTE` en MySQL, luego se envía a Fabric, se espera el commit, y finalmente se marca `CONFIRMADA` en una transacción local.
+- [ ] F6.1 **Bandeja transaccional (outbox)**: la operación se registra como `PENDIENTE` en la misma transacción de MySQL que el cambio académico; luego se ancla en Fabric, se espera el commit, y finalmente se marca `CONFIRMADA` en una transacción local. La profundidad de la bandeja (operaciones `PENDIENTE` o `ENVIADA`) es una métrica del experimento.
 - [ ] F6.2 Idempotencia: la misma `Idempotency-Key` devuelve el mismo `evento_id` y el mismo contenido. En Fabric, un ID repetido se considera "ya confirmado" y no un error.
 - [ ] F6.3 Reintentos con backoff exponencial y un máximo configurable.
 - [ ] F6.4 Escribir `scripts/reconciliation/conciliar.ts`: recorre las operaciones `PENDIENTE` o `ENVIADA` con más de N segundos, consulta Fabric y marca cada una como `CONFIRMADA`, `TARDIA` o `FALLIDA`.
@@ -375,30 +375,37 @@ Las rutas están en `src/app/(prototipo)/`. Solo consumen la API.
 
 ---
 
-### F9: Benchmark con Caliper
+### F9: Benchmark con Caliper y JMeter
+
+> Alineado con el artículo presentado (ADR-015). Si hay diferencias con este plan, manda el artículo.
+
+**Herramientas:**
+- **Caliper**: mide los TPS confirmados, la latencia desde el envío hasta la confirmación en el ledger y la tasa de éxito.
+- **JMeter**, en corridas separadas: mide la latencia de extremo a extremo de la API (`POST /api/v1/eventos`).
 
 - [ ] F9.1 Escribir el conector HTTP en `benchmarks/caliper/connectors/http`, que llama a `POST /api/v1/eventos` con el token de benchmark. Una operación solo se cuenta como éxito cuando la respuesta indica `CONFIRMADA`.
-- [ ] F9.2 Definir dos workloads: `notas-2026` y `asistencias-2026`. La selección de registros se hace con una semilla fija, en el mismo orden para A y B.
+- [ ] F9.2 Definir dos workloads: `notas-2026` y `asistencias-2026`. La selección de registros se hace con una semilla fija, en el mismo orden para A y B. En el modo A, Fabric recibe eventos sintéticos no identificables con la misma estructura y el mismo tamaño que los reales.
 - [ ] F9.3 Crear la matriz en `benchmarks/caliper/config/`:
 
 | Parámetro | Valores |
 |---|---|
-| Estrategia | A, B |
-| TPS ofrecido | 10, 50, 100 |
-| Workers | 2, 4, 8 |
-| Calentamiento / medición | 15 s / 60 s |
+| Estrategia | A, B (orden alternado en cada pareja) |
+| Carga ofrecida (candidata) | 5, 10, 25 y 50 escrituras/s. **Las definitivas se fijan después del piloto** y el cambio se documenta en un ADR |
+| Workers | Se fija en el piloto y se mantiene igual en todas las corridas |
+| Calentamiento / observación | 60 s / 180 s |
 | Repeticiones | 5 |
-| Cargas | notas, asistencias |
-| **Total** | **180 corridas**, unas 3 h 45 min de medición |
+| Cargas de trabajo | notas, asistencias |
+| **Total (candidato)** | 2 × 4 × 2 × 5 = **80 corridas**, unas 5 h 20 min de medición más la preparación |
 
-- [ ] F9.4 Escribir `run.sh` para cada corrida: ejecuta `db:reset-exp`, verifica que la red esté sana, corre Caliper, ejecuta la conciliación de hasta 90 s y exporta los resultados. El orden de A y B se alterna en cada pareja.
-- [ ] F9.5 Capturar recursos con `docker stats` y el CPU y la memoria del generador, y el tamaño de la base experimental y del ledger antes y después.
-- [ ] F9.6 Hacer primero un **piloto** de una combinación por estrategia antes de lanzar las 180.
-- [ ] F9.7 Guardar los resultados en `artifacts/results/<corrida>/` con `config.json` (incluye su hash y el commit de git), `caliper-report.html`, `mediciones.csv` y `recursos.csv`.
+- [ ] F9.4 Escribir `run.sh` para cada corrida: ejecuta `db:reset-exp`, verifica que la red esté sana (`fabric:health`), corre Caliper, ejecuta la conciliación de hasta 90 s y exporta los resultados. El orden de A y B se alterna en cada pareja.
+- [ ] F9.5 Capturar recursos con `docker stats` y el CPU y la memoria del generador; la profundidad de la bandeja transaccional (outbox) durante la corrida; y el tamaño de la base experimental y del ledger antes y después.
+- [ ] F9.6 Hacer primero un **piloto** (una combinación por estrategia) y fijar con él las cargas y los workers definitivos.
+- [ ] F9.7 Plan de JMeter (`benchmarks/jmeter/`): las mismas cargas, en corridas separadas de las de Caliper.
+- [ ] F9.8 Guardar los resultados en `artifacts/results/<corrida>/` con `config.json` (incluye su hash y el commit de git), `caliper-report.html`, `mediciones.csv` y `recursos.csv`.
 
-**Métricas:** TPS ofrecidos, enviados y confirmados; latencia p50, p95 y p99; tasas de éxito, error, timeout y confirmación tardía; tiempo de MySQL frente al de Fabric; CPU y RAM; bytes por transacción válida.
+**Métricas:** media, p50 y p95 de la latencia; tasa de éxito; dispersión entre repeticiones; CPU y RAM; profundidad de la bandeja transaccional (outbox); tamaño del payload (bytes en el ledger y fuera de él). También se reportan los TPS ofrecidos, enviados y confirmados, y las tasas de error, timeout y confirmación tardía.
 
-**Cierre:** 180 corridas completas, cada una trazable a su configuración y commit.
+**Cierre:** todas las corridas de la matriz definitiva completas, cada una trazable a su configuración y commit.
 
 ---
 
