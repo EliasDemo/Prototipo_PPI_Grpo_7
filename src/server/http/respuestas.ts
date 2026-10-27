@@ -34,20 +34,36 @@ export const ok = <T>(data: T, init?: ResponseInit) =>
 
 export const paginado = <T>(data: T[], meta: MetaPaginacion) => Response.json({ data, meta }, { headers: SIN_CACHE });
 
-export function error(e: unknown): Response {
+/** Respuesta ya resuelta (status + cuerpo JSON); la usa la capa de idempotencia para guardarla y repetirla. */
+export interface RespuestaJson {
+  status: number;
+  cuerpo: unknown;
+}
+
+export const comoResponse = ({ status, cuerpo }: RespuestaJson, headers?: Record<string, string>) =>
+  Response.json(cuerpo, { status, headers: { ...SIN_CACHE, ...headers } });
+
+/** Errores esperados (ErrorApi, ZodError) como respuesta; null para cualquier otro. */
+export function errorEsperado(e: unknown): RespuestaJson | null {
   if (e instanceof ErrorApi) return cuerpoError(e.code, e.message, e.detalles);
   if (e instanceof z.ZodError) {
     const detalles = e.issues.map((i) => ({ campo: i.path.join("."), mensaje: i.message }));
     return cuerpoError("VALIDACION", "Parámetros inválidos", detalles);
   }
-  // No se filtra el detalle interno (SQL, rutas, credenciales) al cliente.
-  console.error("[api] error no controlado", e);
-  return cuerpoError("INTERNO", "Error interno del servidor");
+  return null;
 }
 
-function cuerpoError(code: CodigoError, message: string, detalles?: unknown): Response {
+export function error(e: unknown): Response {
+  const esperado = errorEsperado(e);
+  if (esperado) return comoResponse(esperado);
+  // No se filtra el detalle interno (SQL, rutas, credenciales) al cliente.
+  console.error("[api] error no controlado", e);
+  return comoResponse(cuerpoError("INTERNO", "Error interno del servidor"));
+}
+
+function cuerpoError(code: CodigoError, message: string, detalles?: unknown): RespuestaJson {
   const cuerpo: RespuestaError = { error: { code, message, ...(detalles === undefined ? {} : { detalles }) } };
-  return Response.json(cuerpo, { status: STATUS[code], headers: SIN_CACHE });
+  return { status: STATUS[code], cuerpo };
 }
 
 /** Convierte los query params en objeto. Un parámetro repetido es un error. */
