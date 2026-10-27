@@ -51,3 +51,18 @@ crypto-config/
 *.log
 # Nunca: correspondencia con identidades reales
 correspondencia_privada*
+
+# Fabric: binarios descargados y material criptográfico (nunca al repo)
+/infra/fabric/bin/
+/infra/fabric/config/
+/infra/fabric/builders/
+/infra/fabric/network/organizations/
+/infra/fabric/network/channel-artifacts/
+/infra/fabric/network/.cc/
+/infra/fabric/connection-profiles/*
+!/infra/fabric/connection-profiles/README.md
+*.pem
+*_sk
+keystore/
+msp/
+organizations/
