@@ -1,0 +1,24 @@
+{
+  "descripcion": "Conteos comprobados del conjunto seudonimizado (investigacion_mysql.sql). Fuente de verdad para pnpm db:verify.",
+  "tablas": {
+    "ciclos": 3,
+    "estudiantes": 552,
+    "secciones": 57,
+    "asignaturas": 37,
+    "periodos": 4,
+    "ofertas": 336,
+    "fuentes": 62,
+    "matriculas": 1100,
+    "asistencias": 142882,
+    "calificaciones": 24676,
+    "controles": 368
+  },
+  "derivados": {
+    "notas_registradas_2026": 11419,
+    "calificaciones_fuera_de_2026": 0,
+    "controles_no_coinciden": 5,
+    "matriculas_por_anio": { "2024": 355, "2025": 388, "2026": 357 },
+    "asistencias_por_anio": { "2024": 27563, "2025": 63555, "2026": 51764 }
+  },
+  "tablas_prohibidas": ["identidades", "historial_nombres"]
+}

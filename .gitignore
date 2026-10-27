@@ -1,0 +1,12 @@
+node_modules/
+.next/
+/data/
+/artifacts/
+wallet/
+crypto-config/
+.env*
+!.env.example
+*.log
+# Nunca: correspondencia con identidades reales
+correspondencia_privada*.sql
+/proyecto/

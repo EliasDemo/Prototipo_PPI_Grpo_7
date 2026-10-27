@@ -1,0 +1,48 @@
+name: ppi-mysql
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: ppi-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?definir MYSQL_ROOT_PASSWORD en .env}
+      MYSQL_PREP_PASSWORD: ${MYSQL_PREP_PASSWORD:?}
+      MYSQL_RO_USER: ${MYSQL_RO_USER:-app_ro}
+      MYSQL_RO_PASSWORD: ${MYSQL_RO_PASSWORD:?}
+      MYSQL_EXP_USER: ${MYSQL_EXP_USER:-app_exp}
+      MYSQL_EXP_PASSWORD: ${MYSQL_EXP_PASSWORD:?}
+      MYSQL_DB_ORIGEN: ${MYSQL_DB_ORIGEN:-investigacion_peruschool}
+      MYSQL_DB_EXP: ${MYSQL_DB_EXP:-investigacion_experimental}
+      TZ: America/Lima
+    # Mismos valores que conf/my.cnf. Se pasan como flags porque un .cnf montado
+    # desde Windows queda world-writable y MySQL lo ignora.
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=-05:00
+      - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+      - --innodb-buffer-pool-size=1G
+      - --innodb-flush-log-at-trx-commit=1
+      - --sync-binlog=1
+      - --max-connections=300
+      - --max-allowed-packet=256M
+      - --innodb-file-per-table=ON
+      - --secure-file-priv=NULL
+      - --log-bin-trust-function-creators=1
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # Recursos fijos: son parámetro del experimento.
+    cpus: "2.0"
+    mem_limit: 3g
+
+volumes:
+  mysql-data:
