@@ -58,6 +58,7 @@ correspondencia_privada*
 /infra/fabric/builders/
 /infra/fabric/network/organizations/
 /infra/fabric/network/channel-artifacts/
+/infra/fabric/network/peercfg/
 /infra/fabric/network/.cc/
 /infra/fabric/connection-profiles/*
 !/infra/fabric/connection-profiles/README.md

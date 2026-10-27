@@ -23,7 +23,11 @@
     "test:int": "vitest run --project integration",
     "auth:hash": "tsx scripts/auth/hash-password.ts",
     "latencia:api": "tsx --env-file=.env scripts/experiments/latencia-api.ts",
-    "dev:null": "LEDGER=null next dev"
+    "dev:null": "LEDGER=null next dev",
+    "fabric:up": "bash infra/fabric/network/up.sh",
+    "fabric:down": "bash infra/fabric/network/down.sh",
+    "fabric:health": "bash infra/fabric/network/health.sh",
+    "cc:deploy": "bash infra/fabric/network/deploy-cc.sh"
   },
   "dependencies": {
     "mysql2": "^3.24.6",
