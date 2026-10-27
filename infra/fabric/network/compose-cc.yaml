@@ -1,0 +1,33 @@
+# Chaincode como servicio (ADR-016): un contenedor por organización, con recursos fijos.
+# Lo levanta deploy-cc.sh con .cc/cc.env (imagen y package id de cada org); no usar a mano.
+
+name: ppi-fabric-cc
+
+x-cc: &cc
+  image: ${CC_IMAGEN}
+  restart: unless-stopped
+  cpus: ${CPU_CC}
+  mem_limit: ${MEM_CC}
+  networks: [fabric]
+
+services:
+  cc-trazabilidad-org1:
+    <<: *cc
+    container_name: cc-trazabilidad-org1
+    environment:
+      CHAINCODE_ID: ${CC_ID_ORG1}
+      CHAINCODE_SERVER_ADDRESS: 0.0.0.0:9999
+      TAMANO_MAX_EVENTO: ${CC_TAMANO_MAX_EVENTO}
+
+  cc-trazabilidad-org2:
+    <<: *cc
+    container_name: cc-trazabilidad-org2
+    environment:
+      CHAINCODE_ID: ${CC_ID_ORG2}
+      CHAINCODE_SERVER_ADDRESS: 0.0.0.0:9999
+      TAMANO_MAX_EVENTO: ${CC_TAMANO_MAX_EVENTO}
+
+networks:
+  fabric:
+    name: ppi-fabric
+    external: true
