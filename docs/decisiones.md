@@ -104,3 +104,77 @@ Formato: contexto, decisión y consecuencias. Una decisión no se edita: si camb
 - La contraseña inicial del operador se guardó fuera del repositorio, en `~/.ppi-operador` (permisos 600).
 
 **Consecuencias.** Cada integrante genera sus propios secretos. `env.ts` valida los formatos al arrancar y rechaza cualquier variable del servidor expuesta con el prefijo `NEXT_PUBLIC_`.
+
+---
+
+## ADR-009 · Integración contra `next dev` con NullLedger (reemplaza a ADR-004)
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** F3
+
+**Contexto.** NullLedger no debe poder activarse en producción. `next build` fija `NODE_ENV=production` en el código compilado, así que un build nunca puede usarlo, y las pruebas de eventos necesitan un ledger.
+
+**Decisión.** El `globalSetup` de integración levanta `next dev` con `LEDGER=null` en el puerto 3199. `pnpm test:int` ya no compila antes. El build se comprueba aparte con `pnpm build`. La latencia (`pnpm latencia:api`) se sigue midiendo contra `next start`.
+
+**Consecuencias.** La primera solicitud a cada ruta incluye su compilación en modo dev, por lo que los tiempos de las pruebas no sirven como medición. El `globalSetup` además toma una huella del origen (filas y `CHECKSUM TABLE` de las 11 tablas) antes de la suite, y la suite falla si al terminar es distinta (ADR-001).
+
+---
+
+## ADR-010 · NullLedger: semántica híbrida sobre una tabla append-only
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** F3
+
+**Decisión.**
+- `LEDGER=fabric|null`, con `fabric` por defecto. `env.ts` rechaza `null` con `NODE_ENV=production` y el constructor de `NullLedger` también.
+- NullLedger aplica la estrategia B: el detalle y la clave quedan en MySQL, y la evidencia con HMAC va a `ledger_simulado`, una tabla con triggers que impiden UPDATE y DELETE.
+- Sigue el mismo flujo que se usará con Fabric: transacción en MySQL con la operación `PENDIENTE`, luego el anclaje fuera de esa transacción y por último la confirmación local. Si el evidenciaId ya existe con el mismo HMAC, se considera "ya confirmado".
+- Los registros creados con NullLedger quedan con `estrategia = 'B'`. Antes de cada corrida del benchmark se ejecuta `db:reset-exp`, que también vacía `ledger_simulado`.
+
+---
+
+## ADR-011 · Formato de firma de eventos (schemaVersion 1)
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** F3
+
+**Decisión.**
+- **Serialización canónica:** claves ordenadas por unidades UTF-16 (compatible con RFC 8785 para enteros), sin espacios y con `schemaVersion: 1`. Solo se admiten enteros seguros; los decimales viajan como texto exacto (`"18.5000"`, leído del origen con `CAST(valor_numerico AS CHAR)`). Se rechazan `undefined`, `NaN`, `±Infinity`, `-0`, `Date` y los objetos que no son planos.
+- **Qué se firma:** `{ eventoId, registroId, version, operacion, prevEventoId, payload }`. Ni el actor ni la fecha entran en la firma: la fecha va en la evidencia del ledger.
+- **HMAC-SHA256** con una clave aleatoria de 32 bytes por evento, guardada en `evento_clave` y comparada con `timingSafeEqual`.
+- Los vectores fijos de `tests/unit/canonical.test.ts` congelan el formato. Si cambian, se sube `SCHEMA_VERSION`; los vectores no se editan.
+
+---
+
+## ADR-012 · Contenido del payload y del ledger
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** F3
+
+**Decisión.**
+- **El payload no incluye el estudiante.** Solo lleva identificadores seudónimos del catálogo (oferta, asignatura, sección y periodo) y el valor académico tal como aparece en la fuente. El vínculo con la fila de origen vive únicamente en `registro.origen_id`, que la supresión borrará en F7.
+- **El motivo de una rectificación**, que es texto libre, se guarda en el payload (`evento_detalle`, suprimible) y no en `evento.motivo`, que es de solo-anexar y quedará siempre en NULL. Así, un nombre escrito por error en ese campo se puede retirar.
+- **El actor es un rol** (`operador` o `benchmark`), nunca un nombre.
+- **La evidencia** (B y NullLedger) solo contiene ids opacos, la operación, la versión, la fecha, el HMAC y `schemaVersion`.
+
+---
+
+## ADR-013 · Idempotencia de los POST
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** F3
+
+**Decisión.**
+- Todos los POST exigen `Idempotency-Key`: entre 8 y 100 caracteres de `[A-Za-z0-9._:-]`.
+- La huella de cada solicitud es `SHA-256(canonical({ ruta, cuerpo }))`, donde la ruta incluye los ids de la URL.
+- Si llega la misma key con la misma huella, se devuelve la respuesta guardada con la cabecera `Idempotent-Replayed: true`. Con otra huella, se responde 422 `IDEMPOTENCIA_CONFLICTO`; si la primera solicitud sigue en curso, 409 `SOLICITUD_EN_CURSO`.
+- Se guardan las respuestas de éxito y los errores de negocio (404 y 409). Los 400 de validación y los 500 no se guardan y liberan la key, porque la solicitud no llegó a ejecutarse.
+- La misma key identifica la operación hacia el ledger (`operacion.idempotency_key`).
+- `POST /trazabilidad/:id/verificar` también exige la key: un reintento con la misma key devuelve el resultado ya emitido, aunque los datos hayan cambiado después.
+
+---
+
+## ADR-014 · Control de versiones en las rectificaciones
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** F3
+
+**Decisión.**
+- La rectificación parte de la versión que el cliente indica (`versionEsperada`).
+- Dentro de la transacción se ejecuta `SELECT … FROM registro … FOR UPDATE` y se exige `version_actual = versionEsperada`. Si no coincide, responde 409 `VERSION_DESACTUALIZADA` con `versionActual`. `UNIQUE(registro_id, version)` actúa como respaldo.
+- Con cinco rectificaciones concurrentes sobre la misma versión, en las pruebas siempre gana una y las otras cuatro reciben 409.
+- Por exigencia de Next.js, `eventos/[id]` y `trazabilidad/[id]` comparten el nombre del segmento dinámico: `[id]` es el eventoId o el registroId según la ruta.

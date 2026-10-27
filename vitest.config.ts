@@ -23,10 +23,10 @@ export default defineConfig({
         test: {
           name: "integration",
           include: ["tests/integration/**/*.test.ts"],
-          // Levanta `next start` (requiere `next build`) contra el MySQL de Docker.
+          // Levanta `next dev` con LEDGER=null contra el MySQL de Docker (ADR-009).
           globalSetup: ["tests/soporte/servidor.ts"],
           testTimeout: 15000,
-          hookTimeout: 60000,
+          hookTimeout: 120000,
         },
       },
     ],

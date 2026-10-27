@@ -18,12 +18,13 @@ function cabeceras(c: Credencial): Record<string, string> {
 
 export async function llamar<T = unknown>(
   ruta: string,
-  opciones: { credencial?: Credencial; method?: string; body?: unknown } = {},
+  opciones: { credencial?: Credencial; method?: string; body?: unknown; headers?: Record<string, string> } = {},
 ) {
   const res = await fetch(new URL(ruta, inject("baseUrl")), {
     method: opciones.method ?? "GET",
     headers: {
       ...cabeceras(opciones.credencial ?? "bench"),
+      ...opciones.headers,
       ...(opciones.body === undefined ? {} : { "content-type": "application/json" }),
     },
     body: opciones.body === undefined ? undefined : JSON.stringify(opciones.body),

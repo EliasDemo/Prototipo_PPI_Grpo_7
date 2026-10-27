@@ -20,9 +20,10 @@
     "db:migrate": "bash scripts/data/migrar-experimental.sh",
     "db:reset-exp": "bash scripts/data/reset-experimental.sh",
     "test": "vitest run --project unit",
-    "test:int": "next build && vitest run --project integration",
+    "test:int": "vitest run --project integration",
     "auth:hash": "tsx scripts/auth/hash-password.ts",
-    "latencia:api": "tsx --env-file=.env scripts/experiments/latencia-api.ts"
+    "latencia:api": "tsx --env-file=.env scripts/experiments/latencia-api.ts",
+    "dev:null": "LEDGER=null next dev"
   },
   "dependencies": {
     "mysql2": "^3.24.6",
