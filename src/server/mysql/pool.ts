@@ -28,8 +28,12 @@ function crear(nombre: NombrePool): Pool {
     dateStrings: true,
     decimalNumbers: true,
     // BOOLEAN (TINYINT(1)) llega como true/false.
-    typeCast: (campo, siguiente) =>
-      campo.type === "TINY" && campo.length === 1 ? (campo.string() === null ? null : campo.string() === "1") : siguiente(),
+    // Ojo: campo.string() consume el valor del paquete; se llama una sola vez.
+    typeCast: (campo, siguiente) => {
+      if (campo.type !== "TINY" || campo.length !== 1) return siguiente();
+      const v = campo.string();
+      return v === null ? null : v === "1";
+    },
   });
 }
 
