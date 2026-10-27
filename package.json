@@ -1,5 +1,6 @@
 {
-  "name": "prototipo-ppi-grupo-7",
+  "name": "investigacion-blockchain",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.34.6",
@@ -7,7 +8,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "db:up": "docker compose --env-file .env -f infra/mysql/compose.yaml up -d --wait",
     "db:down": "docker compose --env-file .env -f infra/mysql/compose.yaml down",
     "db:import": "bash scripts/data/importar-origen.sh",
@@ -16,12 +21,21 @@
     "db:reset-exp": "bash scripts/data/reset-experimental.sh"
   },
   "dependencies": {
+    "next": "16.4.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "mysql2": "^3.24.6",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "tsx": "^4.23.15"
   }
 }

@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "ms-vscode-remote.remote-wsl",
+    "ms-azuretools.vscode-containers",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-mysql",
+    "vitest.explorer",
+    "humao.rest-client",
+    "yzhang.markdown-all-in-one",
+    "eamodio.gitlens"
+  ]
+}
