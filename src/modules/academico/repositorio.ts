@@ -99,13 +99,12 @@ export async function listarCalificaciones(f: FiltrosCalificaciones) {
     ["c.registrada = ?", f.registrada],
   ]);
   const necesitaOferta = f.seccion !== undefined || f.asignatura !== undefined;
+  const desde = `FROM calificaciones c ${necesitaOferta ? "JOIN ofertas o ON o.oferta_id = c.oferta_id" : ""} ${w.sql}`;
 
   const [n, filas] = await Promise.all([
-    total(
-      `SELECT COUNT(*) n FROM calificaciones c
-         ${necesitaOferta ? "JOIN ofertas o ON o.oferta_id = c.oferta_id" : ""} ${w.sql}`,
-      w.params,
-    ),
+    total(`SELECT COUNT(*) n ${desde}`, w.params),
+    // Paginación diferida: primero las PK en orden (recorre el índice primario, sin ordenar
+    // toda la tabla) y luego los JOIN solo para las filas de la página.
     query<{
       calificacion_id: string; estudiante_id: string; anio: number; periodo_id: string; oferta_id: string;
       seccion_id: string; asignatura_id: string; asignatura: string; valor_fuente: string | null;
@@ -117,12 +116,11 @@ export async function listarCalificaciones(f: FiltrosCalificaciones) {
               o.seccion_id, o.asignatura_id, a.nombre asignatura,
               c.valor_fuente, c.valor_numerico, c.registrada, c.nivel_agregacion,
               c.fuente_id, c.hoja_fuente, c.fila_fuente, c.columna_fuente
-         FROM calificaciones c
+         FROM (SELECT c.calificacion_id ${desde} ORDER BY c.calificacion_id LIMIT ? OFFSET ?) p
+         JOIN calificaciones c ON c.calificacion_id = p.calificacion_id
          JOIN ofertas o ON o.oferta_id = c.oferta_id
          JOIN asignaturas a ON a.asignatura_id = o.asignatura_id
-         ${w.sql}
-        ORDER BY c.calificacion_id
-        LIMIT ? OFFSET ?`,
+        ORDER BY c.calificacion_id`,
       [...w.params, f.pageSize, offset(f)],
     ),
   ]);
