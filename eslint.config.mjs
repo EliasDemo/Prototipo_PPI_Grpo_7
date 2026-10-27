@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // El chaincode (CommonJS, fabric-contract-api) tiene sus propias pruebas: pnpm test:cc
+    "chaincode/**",
   ]),
 ]);
 

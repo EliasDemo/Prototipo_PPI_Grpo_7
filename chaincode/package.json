@@ -1,0 +1,16 @@
+{
+  "name": "trazabilidad-chaincode",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Contrato `trazabilidad` (Hyperledger Fabric 2.5): evidencias del modo B y eventos sintéticos del modo A",
+  "main": "src/index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "fabric-chaincode-node start",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "fabric-contract-api": "2.5.8",
+    "fabric-shim": "2.5.8"
+  }
+}

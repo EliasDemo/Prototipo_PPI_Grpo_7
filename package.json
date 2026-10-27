@@ -27,7 +27,8 @@
     "fabric:up": "bash infra/fabric/network/up.sh",
     "fabric:down": "bash infra/fabric/network/down.sh",
     "fabric:health": "bash infra/fabric/network/health.sh",
-    "cc:deploy": "bash infra/fabric/network/deploy-cc.sh"
+    "cc:deploy": "bash infra/fabric/network/deploy-cc.sh",
+    "test:cc": "npm --prefix chaincode test"
   },
   "dependencies": {
     "mysql2": "^3.24.6",
