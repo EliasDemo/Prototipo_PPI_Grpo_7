@@ -1,5 +1,5 @@
 import "server-only";
-import mysql, { type Pool, type RowDataPacket } from "mysql2/promise";
+import mysql, { type Pool, type PoolConnection, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import { env } from "@/server/config/env";
 
 export type NombrePool = "ro" | "exp";
@@ -41,7 +41,7 @@ export function pool(nombre: NombrePool): Pool {
   return (g.__ppiPools![nombre] ??= crear(nombre));
 }
 
-export type Parametro = string | number | boolean | null | Date;
+export type Parametro = string | number | boolean | null | Date | Buffer;
 
 /**
  * Ejecuta SQL parametrizado (placeholders `?`) con timeout.
@@ -54,6 +54,54 @@ export async function query<T>(nombre: NombrePool, sql: string, params: readonly
     timeout: env().MYSQL_QUERY_TIMEOUT_MS,
   });
   return filas as T[];
+}
+
+/** INSERT / UPDATE / DELETE parametrizado; devuelve filas afectadas e insertId. */
+export async function ejecutar(nombre: NombrePool, sql: string, params: readonly Parametro[] = []): Promise<ResultSetHeader> {
+  const [r] = await pool(nombre).query<ResultSetHeader>({ sql, values: [...params], timeout: env().MYSQL_QUERY_TIMEOUT_MS });
+  return r;
+}
+
+/** Conexión dentro de una transacción: mismas reglas que query()/ejecutar(). */
+export interface Transaccion {
+  query<T>(sql: string, params?: readonly Parametro[]): Promise<T[]>;
+  ejecutar(sql: string, params?: readonly Parametro[]): Promise<ResultSetHeader>;
+}
+
+function envolver(c: PoolConnection): Transaccion {
+  const timeout = env().MYSQL_QUERY_TIMEOUT_MS;
+  return {
+    async query<T>(sql: string, params: readonly Parametro[] = []) {
+      const [filas] = await c.query<RowDataPacket[]>({ sql, values: [...params], timeout });
+      return filas as T[];
+    },
+    async ejecutar(sql: string, params: readonly Parametro[] = []) {
+      const [r] = await c.query<ResultSetHeader>({ sql, values: [...params], timeout });
+      return r;
+    },
+  };
+}
+
+/** Ejecuta `fn` en una transacción: COMMIT si termina, ROLLBACK si lanza. */
+export async function transaccion<T>(nombre: NombrePool, fn: (tx: Transaccion) => Promise<T>): Promise<T> {
+  const c = await pool(nombre).getConnection();
+  try {
+    await c.beginTransaction();
+    const r = await fn(envolver(c));
+    await c.commit();
+    return r;
+  } catch (e) {
+    await c.rollback().catch(() => {});
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+
+/** true si el error es una clave duplicada de MySQL (opcionalmente, de un índice concreto). */
+export function esDuplicado(e: unknown, indice?: string): boolean {
+  const err = e as { code?: string; sqlMessage?: string };
+  return err?.code === "ER_DUP_ENTRY" && (!indice || (err.sqlMessage ?? "").includes(`'${indice}'`) || (err.sqlMessage ?? "").includes(`.${indice}'`));
 }
 
 /** Para pruebas y apagado ordenado. */

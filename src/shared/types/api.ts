@@ -21,6 +21,11 @@ export type CodigoError =
   | "CREDENCIALES_INVALIDAS"
   | "NO_ENCONTRADO"
   | "CONFLICTO"
+  | "VERSION_DESACTUALIZADA"
+  | "REGISTRO_NO_VIGENTE"
+  | "SOLICITUD_EN_CURSO"
+  | "IDEMPOTENCIA_CONFLICTO"
+  | "NO_DISPONIBLE"
   | "INTERNO";
 
 export interface RespuestaError {
