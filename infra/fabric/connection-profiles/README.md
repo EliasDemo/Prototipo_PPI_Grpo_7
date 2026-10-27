@@ -8,4 +8,4 @@ org1/user1-key.pem      clave privada (permisos 600)
 org1/peer0-tls-ca.pem   CA TLS de peer0.org1
 ```
 
-Las rutas se ponen en `.env` (`FABRIC_CERT_PATH`, `FABRIC_KEY_PATH` y `FABRIC_TLS_CERT_PATH`) y solo las usa el servidor. `pnpm fabric:down` borra este contenido. Fuera de este README, nada de esta carpeta entra al repositorio.
+`perfiles.sh` también escribe las rutas en `.env` (`FABRIC_CERT_PATH`, `FABRIC_KEY_PATH` y `FABRIC_TLS_CERT_PATH`, además de endpoint, alias y MSP). Solo las usa el servidor; para regenerarlas: `bash infra/fabric/network/perfiles.sh`. `pnpm fabric:down` borra este contenido. Fuera de este README, nada de esta carpeta entra al repositorio.

@@ -37,6 +37,26 @@ Son parámetros del experimento. Los valores salen de `infra/mysql/compose.yaml`
 | `cc-trazabilidad-org2` | 0,5 | 512 MB | Chaincode como servicio, el de Org2 |
 | **Total** | **7,0** | **9 GB** | |
 
+### Uso en reposo (27/10/2026, red recién levantada)
+
+| Contenedor | CPU | RAM |
+|---|---|---|
+| orderer | 0,12 % | 12,9 MiB |
+| peer0.org1 / peer0.org2 | 0,9 % / 1,4 % | 32,3 / 32,9 MiB |
+| cc-trazabilidad-org1 / org2 | 0 % | 23,7 / 23,1 MiB |
+
+### Tiempo de levantar la red desde cero
+
+`pnpm fabric:down && pnpm fabric:up` se midió en tres corridas seguidas. Incluye el material criptográfico, los contenedores, el canal, la convergencia del gossip y el despliegue del chaincode con la imagen ya en caché.
+
+| Corrida | Red y canal listos | Total con chaincode |
+|---|---|---|
+| 1 | 5,0 s | 13,3 s |
+| 2 | 5,5 s | 13,3 s |
+| 3 | 5,5 s | 13,3 s |
+
+Unos 3,5 s del tramo de red son la espera de la convergencia del gossip, necesaria para que el descubrimiento vea a Org2. El primer despliegue en una máquina nueva tarda más, porque construye la imagen del chaincode (`npm ci`).
+
 ## Software de Fabric
 
 Las versiones exactas y los digests de cada imagen están en `infra/fabric/versiones.env`.

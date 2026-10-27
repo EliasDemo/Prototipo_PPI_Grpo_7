@@ -11,8 +11,7 @@ cp "$USUARIO/keystore/"* "$DEST/user1-key.pem"
 cp "$ORG_DIR/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" "$DEST/peer0-tls-ca.pem"
 chmod 600 "$DEST/user1-key.pem"
 
-cat <<ENV
-# Pegar en .env (solo del servidor; nunca con NEXT_PUBLIC_):
+VARS=$(cat <<ENV
 FABRIC_PEER_ENDPOINT=localhost:7051
 FABRIC_PEER_HOST_ALIAS=peer0.org1.example.com
 FABRIC_MSP_ID=Org1MSP
@@ -20,3 +19,14 @@ FABRIC_CERT_PATH=$DEST/user1-cert.pem
 FABRIC_KEY_PATH=$DEST/user1-key.pem
 FABRIC_TLS_CERT_PATH=$DEST/peer0-tls-ca.pem
 ENV
+)
+
+# Actualiza .env (ignorado por git) si existe; si no, solo muestra las variables.
+ENV_FILE="$(cd "$FABRIC/../.." && pwd)/.env"
+if [[ -f "$ENV_FILE" ]]; then
+  while IFS='=' read -r clave valor; do
+    if grep -q "^$clave=" "$ENV_FILE"; then sed -i "s#^$clave=.*#$clave=$valor#" "$ENV_FILE"; else echo "$clave=$valor" >> "$ENV_FILE"; fi
+  done <<<"$VARS"
+  echo "Variables FABRIC_* actualizadas en .env"
+fi
+echo "$VARS"

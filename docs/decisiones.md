@@ -198,3 +198,31 @@ Formato: contexto, decisión y consecuencias. Una decisión no se edita: si camb
 **Pendiente de decisión del equipo.** El short paper (sección II.B, RQ3) compara contra una **línea base de solo base de datos** ("database-only baseline"), y la matriz solo compara A contra B. También indica que el evento anclado incluye el **rol del actor**, que no está entre los campos permitidos de `RegistrarEvidencia`. Ninguno de los dos se implementa sin una decisión explícita.
 
 **Consecuencias.** `PLAN_DESARROLLO.md` (secciones 1, F4.3, F5.2, F6.1 y F9) queda actualizado. La matriz candidata tiene 80 corridas.
+
+---
+
+## ADR-016 · Red Fabric: chaincode como servicio y parámetros fijos
+
+**Fecha:** 27/10/2026 · **Estado:** aceptada · **Fase:** F4
+
+**Contexto.** El runtime clásico de chaincode obliga al peer a construir y lanzar contenedores mediante el socket de Docker. Esos contenedores escapan a los límites de recursos de compose y el peer necesita acceso privilegiado al daemon. Además, `CORE_VM_ENDPOINT=""` no desactiva ese runtime, porque viper ignora las variables de entorno vacías.
+
+**Decisión.**
+- **Chaincode como servicio (CCaaS).** Hay un contenedor por organización (`cc-trazabilidad-org1` y `-org2`) con 0,5 CPU y 512 MB fijos, cada uno con su propio paquete y su `connection.json`. La definición del chaincode (nombre, versión, secuencia y política) es única para el canal. El peer usa un `core.yaml` generado con `vm.endpoint` vacío: no tiene acceso a Docker y `/healthz` no depende de él.
+- **Conexión entre el peer y el chaincode:** sin TLS, dentro de la red Docker interna `ppi-fabric`, que no publica el puerto 9999. Es una simplificación de laboratorio y se reporta como límite.
+- **Política de endorsement** `AND('Org1MSP.peer','Org2MSP.peer')`, igual para A y B. `fabric:prueba` demuestra que una transacción respaldada solo por Org1 queda invalidada (`ENDORSEMENT_POLICY_FAILURE`).
+- **Parámetros fijos del experimento:**
+  - un orderer Raft (1 CPU, 1 GB) y dos peers (1,5 CPU y 2 GB cada uno);
+  - LevelDB;
+  - `BatchTimeout` de 2 s, `MaxMessageCount` de 10 y `PreferredMaxBytes` de 512 KB;
+  - `TAMANO_MAX_EVENTO` de 4096 bytes (modo A), igual en ambos contenedores para que el chaincode sea determinista.
+- **Material criptográfico** generado con `cryptogen`, solo con identidades de laboratorio. La identidad cliente es `User1@org1.example.com` (OU client). Nada de eso entra al repositorio: `.gitignore` lo excluye y el script de commit aborta si se prepara un archivo así.
+- **Contrato:**
+  - `REVOCAR` no ocupa una versión de la cadena: es un registro aparte (`revocacion~evidencia`), con el motivo tomado de una lista cerrada de códigos.
+  - Las operaciones encadenadas por versión son `CREAR`, `RECTIFICAR` y `SUPRIMIR`.
+  - Los errores llevan un prefijo `CODIGO:` para que el cliente los distinga en F5.
+
+**Consecuencias.**
+- `BatchTimeout` y `MaxMessageCount` condicionan la latencia de confirmación a cargas bajas: con pocas transacciones, el bloque se corta por tiempo. Hay que reportarlos junto a los resultados.
+- Un solo orderer no tolera fallos (Raft con un nodo). Es suficiente para medir A frente a B en igualdad de condiciones, pero no es una configuración de producción.
+- **Pendiente de decisión del equipo:** el short paper menciona el rol del actor en el evento anclado (ADR-015), y `RegistrarEvidencia` no lo admite.
