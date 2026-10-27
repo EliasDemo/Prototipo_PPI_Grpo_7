@@ -37,9 +37,23 @@ describe("filtros", () => {
   });
 
   it("exige fechas ISO y desde <= hasta", () => {
-    expect(filtrosAsistencias.safeParse({ desde: "2025-08-01", hasta: "2025-08-31" }).success).toBe(true);
-    expect(filtrosAsistencias.safeParse({ desde: "2025-09-01", hasta: "2025-08-31" }).success).toBe(false);
-    expect(filtrosAsistencias.safeParse({ desde: "01/08/2025" }).success).toBe(false);
-    expect(filtrosAsistencias.safeParse({ desde: "2025-02-30" }).success).toBe(false);
+    expect(filtrosAsistencias.safeParse({ anio: "2025", desde: "2025-08-01", hasta: "2025-08-31" }).success).toBe(true);
+    expect(filtrosAsistencias.safeParse({ anio: "2025", desde: "2025-09-01", hasta: "2025-08-31" }).success).toBe(false);
+    expect(filtrosAsistencias.safeParse({ anio: "2025", desde: "01/08/2025" }).success).toBe(false);
+    expect(filtrosAsistencias.safeParse({ anio: "2025", desde: "2025-02-30" }).success).toBe(false);
+  });
+
+  it.each([{ seccion: "SEC-00ED1D59363A88B2AE2F" }, { desde: "2025-08-01" }, { hasta: "2025-08-31" }])(
+    "asistencias exige anio con %o",
+    (q) => {
+      const r = filtrosAsistencias.safeParse(q);
+      expect(r.success).toBe(false);
+      expect(r.error?.issues[0]?.path).toEqual(["anio"]);
+      expect(filtrosAsistencias.safeParse({ ...q, anio: "2025" }).success).toBe(true);
+    },
+  );
+
+  it("asistencias sin filtros no exige anio", () => {
+    expect(filtrosAsistencias.safeParse({ page: "3" }).success).toBe(true);
   });
 });

@@ -31,6 +31,11 @@ export const filtrosCalificaciones = paginacion
 export const filtrosAsistencias = paginacion
   .extend({ anio: anio.optional(), seccion: seccionId.optional(), desde: fecha.optional(), hasta: fecha.optional() })
   .strict()
+  // ADR-002: el origen no tiene índices por sección o fecha sola; `anio` permite usar idx_asistencia_fecha (anio, fecha).
+  .refine((f) => f.anio !== undefined || (f.seccion === undefined && f.desde === undefined && f.hasta === undefined), {
+    message: "anio es obligatorio al filtrar por seccion, desde o hasta",
+    path: ["anio"],
+  })
   .refine((f) => !f.desde || !f.hasta || f.desde <= f.hasta, { message: "desde debe ser <= hasta", path: ["desde"] });
 
 export const filtrosCatalogo = z.object({ anio: anio.optional() }).strict();

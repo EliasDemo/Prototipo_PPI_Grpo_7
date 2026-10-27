@@ -129,7 +129,7 @@ describe("GET /api/v1/academico/asistencias", () => {
 
   it("rango de fechas inclusivo", async () => {
     const { n } = await uno("SELECT COUNT(*) n FROM asistencias WHERE fecha BETWEEN '2025-08-01' AND '2025-08-31'");
-    const { json } = await llamar<Paginada<Asistencia>>("/api/v1/academico/asistencias?desde=2025-08-01&hasta=2025-08-31&pageSize=200");
+    const { json } = await llamar<Paginada<Asistencia>>("/api/v1/academico/asistencias?anio=2025&desde=2025-08-01&hasta=2025-08-31&pageSize=200");
     expect(json.meta.total).toBe(Number(n));
     expect(json.data.every((a) => a.fecha >= "2025-08-01" && a.fecha <= "2025-08-31")).toBe(true);
   });
@@ -139,7 +139,7 @@ describe("GET /api/v1/academico/asistencias", () => {
     const vistos = new Set<string>();
     let total = 0;
     for (let page = 1; ; page++) {
-      const { json } = await llamar<Paginada<Asistencia>>(`/api/v1/academico/asistencias?seccion=${s.seccionId}&pageSize=200&page=${page}`);
+      const { json } = await llamar<Paginada<Asistencia>>(`/api/v1/academico/asistencias?anio=${s.anio}&seccion=${s.seccionId}&pageSize=200&page=${page}`);
       total = json.meta.total;
       json.data.forEach((a) => vistos.add(a.asistenciaId));
       if (json.data.length < 200) break;
@@ -170,7 +170,9 @@ describe("validación común", () => {
     "/api/v1/academico/calificaciones?registrada=si",
     "/api/v1/academico/estudiantes?nombre=x",
     "/api/v1/academico/estudiantes?anio=2024&anio=2025",
-    "/api/v1/academico/asistencias?desde=2025-09-01&hasta=2025-01-01",
+    "/api/v1/academico/asistencias?anio=2025&desde=2025-09-01&hasta=2025-01-01",
+    "/api/v1/academico/asistencias?desde=2025-08-01",
+    "/api/v1/academico/asistencias?seccion=SEC-1543F5A159A8AFC6A6CD",
   ])("400 VALIDACION: %s", async (ruta) => {
     const { status, json, headers } = await llamar<ConError>(ruta);
     expect(status).toBe(400);

@@ -43,7 +43,7 @@ const ESCENARIOS: Record<string, () => string> = {
   "academico/calificaciones?registrada&periodo": () => `/academico/calificaciones?registrada=true&periodo=PER-2026-${1 + Math.floor(azar() * 4)}&pageSize=50&page=${pagina(2800)}`,
   "academico/asistencias": () => `/academico/asistencias?pageSize=50&page=${pagina(142882)}`,
   "academico/asistencias?anio&desde&hasta": () => `/academico/asistencias?anio=2025&desde=2025-03-01&hasta=2025-12-31&pageSize=50&page=${pagina(60000)}`,
-  "academico/asistencias?seccion": () => `/academico/asistencias?seccion=${sec().seccionId}&pageSize=50&page=${pagina(2500)}`,
+  "academico/asistencias?anio&seccion": () => { const s = sec(); return `/academico/asistencias?anio=${s.anio}&seccion=${s.seccionId}&pageSize=50&page=${pagina(2500)}`; },
 };
 
 const percentil = (xs: number[], p: number) => xs[Math.min(xs.length - 1, Math.ceil((p / 100) * xs.length) - 1)]!;

@@ -52,3 +52,7 @@ La regla es no modificar `investigacion_peruschool` sin consulta. Estos índices
 | `calificaciones (registrada, periodo_id)` | Conteo de Q4 sin recorrido completo | Menos de 1 MB |
 
 Alternativa sin tocar el origen: exigir `anio` cuando se filtra por `desde`/`hasta`, y cachear `datos/resumen` en memoria, porque el origen es inmutable.
+
+## Actualización: `anio` obligatorio (ADR-002)
+
+Se eligió no tocar el origen. Desde este cambio, `asistencias` exige `anio` cuando se filtra por `seccion`, `desde` o `hasta`. Medición nueva con concurrencia 4 (tres corridas): p99 de `anio&seccion` de 89 a 95 ms y p99 de `anio&desde&hasta` de 77 a 89 ms. El plan del filtro por sección no cambió (ver ADR-002 en `docs/decisiones.md`).
