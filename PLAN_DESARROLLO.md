@@ -364,12 +364,12 @@ src/modules/academico/
 
 Las rutas están en `src/app/(prototipo)/`. Solo consumen la API.
 
-- [ ] F8.1 `/acceso`: login del operador.
-- [ ] F8.2 `/datos`: cobertura, conteos, fuentes y diferencias.
-- [ ] F8.3 `/academico`: tablas con filtros y paginación.
-- [ ] F8.4 `/laboratorio`: crear copias, rectificar, revocar y suprimir.
-- [ ] F8.5 `/trazabilidad`: línea de versiones con su estado y el botón "verificar".
-- [ ] F8.6 `/experimentos`: lista de corridas y descarga de CSV y JSON.
+- [x] F8.1 `/acceso`: login del operador.
+- [x] F8.2 `/datos`: cobertura, conteos, fuentes y diferencias.
+- [x] F8.3 `/academico`: tablas con filtros y paginación.
+- [x] F8.4 `/laboratorio`: crear copias, rectificar, revocar y suprimir.
+- [x] F8.5 `/trazabilidad`: línea de versiones con su estado y el botón "verificar".
+- [x] F8.6 `/experimentos`: lista de corridas y descarga de CSV y JSON.
 
 **Cierre:** se puede hacer la demo completa sin usar la terminal.
 

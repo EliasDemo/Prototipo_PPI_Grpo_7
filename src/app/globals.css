@@ -1,26 +1,108 @@
-@import "tailwindcss";
+@import "@fontsource/bitter/500.css";
+@import "@fontsource/bitter/700.css";
+@import "@fontsource/atkinson-hyperlegible/400.css";
+@import "@fontsource/atkinson-hyperlegible/700.css";
 
+/* Pizarra y cuaderno: la barra lateral es el pizarrón del aula; el contenido, una hoja cuadriculada. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --pizarra: #1d3b34;
+  --pizarra-2: #2b5147;
+  --tiza: #f3f6ef;
+  --hoja: #fbfcf8;
+  --cuadricula: #e4ebe6;
+  --tinta: #1b2a33;
+  --tenue: #55665f;
+  --borde: #bccbc3;
+  --azul: #1f4e8c;
+  --bien: #17663f;
+  --espera: #8a5a00;
+  --mal: #a3211a;
+  --aparte: #5b3f8c;
 }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--hoja); color: var(--tinta); font: 400 1rem/1.5 "Atkinson Hyperlegible", system-ui, sans-serif; }
+h1, h2, h3 { font-family: "Bitter", Georgia, serif; line-height: 1.2; margin: 0; }
+h1 { font-size: 2rem; font-weight: 700; }
+h2 { font-size: 1.3rem; font-weight: 700; margin-block: 2rem .6rem; }
+h3 { font-size: 1.05rem; font-weight: 500; }
+p { max-width: 70ch; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .86em; }
+:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+.tenue { color: var(--tenue); }
+a { color: var(--azul); }
+td code { white-space: nowrap; }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+.marco { display: grid; grid-template-columns: 15rem 1fr; min-height: 100vh; }
+.pizarron { background: var(--pizarra); color: var(--tiza); padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.pizarron .marca { font: 700 1.25rem/1.2 "Bitter", serif; }
+.pizarron nav { display: grid; gap: .2rem; }
+.pizarron a { color: inherit; text-decoration: none; padding: .45rem .7rem; border-radius: 4px; }
+.pizarron a:hover { background: var(--pizarra-2); }
+.pizarron a[aria-current="page"] { background: var(--tiza); color: var(--pizarra); font-weight: 700; }
+.pizarron :focus-visible { outline-color: var(--tiza); }
+.pizarron .modo { margin-top: auto; font-size: .9rem; display: grid; gap: .6rem; }
+.pizarron button { background: none; color: inherit; border-color: var(--tiza); justify-self: start; }
+.pizarron button:hover { background: var(--pizarra-2); }
+.contenido { padding: 2rem clamp(1rem, 4vw, 3rem) 4rem; min-width: 0;
+  background-image: linear-gradient(var(--cuadricula) 1px, transparent 1px), linear-gradient(90deg, var(--cuadricula) 1px, transparent 1px);
+  background-size: 24px 24px; }
+.lamina { background: var(--hoja); }
+.intro { margin-block: .5rem 1.5rem; color: var(--tenue); }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+button, select, input { font: inherit; color: inherit; }
+button { padding: .4rem .8rem; border: 1px solid var(--pizarra); border-radius: 4px; background: var(--hoja); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--cuadricula); }
+button:disabled { opacity: .5; cursor: default; }
+button.principal { background: var(--pizarra); color: var(--tiza); }
+button.principal:hover:not(:disabled) { background: var(--pizarra-2); }
+button.peligro { border-color: var(--mal); color: var(--mal); }
+select, input { padding: .4rem .5rem; border: 1px solid var(--borde); border-radius: 4px; background: #fff; max-width: 100%; }
+label { display: grid; gap: .2rem; font-size: .9rem; }
+.filtros { display: flex; flex-wrap: wrap; gap: .8rem; align-items: end; margin-bottom: 1rem; }
+.pestanas { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: 1rem; }
+.pestanas button[aria-pressed="true"] { background: var(--pizarra); color: var(--tiza); }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.tabla { overflow-x: auto; background: var(--hoja); border: 1px solid var(--borde); }
+table { border-collapse: collapse; width: 100%; font-size: .94rem; }
+th { text-align: left; font-weight: 700; background: var(--tiza); border-bottom: 2px solid var(--pizarra); white-space: nowrap; }
+th, td { padding: .45rem .7rem; }
+td { border-bottom: 1px solid var(--cuadricula); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.paginador { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; margin-top: .8rem; }
+
+.estado { font-weight: 700; white-space: nowrap; }
+.estado.bien { color: var(--bien); } .estado.espera { color: var(--espera); } .estado.mal { color: var(--mal); } .estado.aparte { color: var(--aparte); }
+.aviso { padding: .6rem .8rem; border-left: 4px solid; background: var(--hoja); max-width: 70ch; }
+.aviso.error { border-color: var(--mal); color: var(--mal); }
+.aviso.exito { border-color: var(--bien); color: var(--bien); }
+
+.conteos { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); margin: 0; border: 1px solid var(--borde); background: var(--hoja); }
+.conteos div { padding: .6rem .8rem; border: 1px solid var(--cuadricula); }
+.conteos dt { font-size: .88rem; color: var(--tenue); }
+.conteos dd { margin: 0; font: 700 1.3rem "Bitter", serif; font-variant-numeric: tabular-nums; }
+
+/* La línea de versiones es el elemento central: cada versión es un nudo de un hilo continuo. */
+.hilo { list-style: none; margin: 1rem 0; padding: 0; }
+.nudo { position: relative; padding: 0 0 1.5rem 3.4rem; }
+.nudo::before { content: ""; position: absolute; left: 1.15rem; top: 0; bottom: 0; width: 3px; background: var(--pizarra); }
+.nudo:last-child::before { bottom: auto; height: 1.2rem; }
+.numero { position: absolute; left: 0; top: 0; width: 2.6rem; height: 2.6rem; border-radius: 50%; display: grid; place-items: center;
+  background: var(--pizarra); color: var(--tiza); font: 700 1.1rem "Bitter", serif; }
+.nudo.suprimir .numero { background: var(--aparte); }
+.ficha { background: var(--hoja); border: 1px solid var(--borde); padding: .7rem .9rem; display: grid; gap: .4rem; max-width: 46rem; }
+.ficha .cabeza { display: flex; flex-wrap: wrap; gap: .6rem; align-items: baseline; justify-content: space-between; }
+.ficha ul { margin: 0; padding-left: 1.1rem; font-size: .92rem; }
+.acciones { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; }
+.panel { background: var(--hoja); border: 1px solid var(--borde); padding: .9rem; margin-top: .8rem; display: grid; gap: .7rem; max-width: 46rem; }
+
+.acceso { min-height: 100vh; display: grid; place-items: center; background: var(--pizarra); padding: 1rem; }
+.acceso form { background: var(--hoja); padding: 2rem; width: min(24rem, 100%); display: grid; gap: 1rem; }
+
+@media (max-width: 760px) {
+  .marco { grid-template-columns: 1fr; }
+  .pizarron { padding: 1rem; gap: .7rem; }
+  .pizarron nav { display: flex; flex-wrap: wrap; }
+  .pizarron .modo { margin-top: 0; }
 }

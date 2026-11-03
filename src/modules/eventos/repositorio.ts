@@ -112,3 +112,25 @@ export async function cadenaDeVersiones(registroId: string): Promise<EslabonCade
     estadoOperacion: f.op_estado, detallePresente: Number(f.detalle) === 1,
   }));
 }
+
+export async function listarRegistros(page: number, pageSize: number) {
+  const [[n], filas] = await Promise.all([
+    query<{ n: number }>("exp", "SELECT COUNT(*) n FROM registro"),
+    query<{ registro_id: string; tipo: TipoRegistro; estrategia: string; estado_vigencia: string; estado_detalle: string; version_actual: number; creado_en: string; op_estado: string | null }>(
+      "exp",
+      `SELECT r.registro_id, r.tipo, r.estrategia, r.estado_vigencia, r.estado_detalle, r.version_actual, r.creado_en, o.estado op_estado
+         FROM registro r
+         LEFT JOIN evento e ON e.registro_id = r.registro_id AND e.version = r.version_actual
+         LEFT JOIN operacion o ON o.evento_id = e.evento_id
+        ORDER BY r.creado_en DESC, r.registro_id LIMIT ? OFFSET ?`,
+      [pageSize, (page - 1) * pageSize],
+    ),
+  ]);
+  return {
+    total: Number(n?.n ?? 0),
+    data: filas.map((f) => ({
+      registroId: f.registro_id, tipo: f.tipo, estrategia: f.estrategia, estadoVigencia: f.estado_vigencia, estadoDetalle: f.estado_detalle,
+      versionActual: f.version_actual, creadoEn: isoDesdeMysql(f.creado_en), estadoOperacion: f.op_estado,
+    })),
+  };
+}

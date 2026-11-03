@@ -36,6 +36,8 @@
     "fabric:prueba": "bash infra/fabric/network/prueba-cli.sh"
   },
   "dependencies": {
+    "@fontsource/atkinson-hyperlegible": "^5.3.0",
+    "@fontsource/bitter": "^5.3.0",
     "@grpc/grpc-js": "^1.14.7",
     "@hyperledger/fabric-gateway": "^1.13.0",
     "mysql2": "^3.24.6",
