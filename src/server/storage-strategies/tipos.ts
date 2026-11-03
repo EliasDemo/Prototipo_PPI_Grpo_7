@@ -8,10 +8,10 @@ import type {
 
 /**
  * Estrategia de almacenamiento (PLAN_DESARROLLO.md, sección 3).
- * A (referencia) y B (híbrida) llegan en F5; en F3 solo existe NullLedger.
+ * BD (línea base sin ledger), A (referencia) y B (híbrida); NullLedger solo para desarrollo y pruebas.
  */
 export interface StorageStrategy {
-  readonly nombre: "A" | "B" | "NULL";
+  readonly nombre: "A" | "B" | "BD" | "NULL";
 
   /**
    * Persiste el evento en MySQL y lo ancla en el ledger.

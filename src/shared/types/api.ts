@@ -26,6 +26,7 @@ export type CodigoError =
   | "SOLICITUD_EN_CURSO"
   | "IDEMPOTENCIA_CONFLICTO"
   | "NO_DISPONIBLE"
+  | "LEDGER_RECHAZO"
   | "INTERNO";
 
 export interface RespuestaError {

@@ -28,7 +28,7 @@ const esquema = z
     FABRIC_CHAINCODE: z.string().default("trazabilidad"),
     FABRIC_COMMIT_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 
-    EXPERIMENT_STRATEGY: z.enum(["A", "B"]).default("B"),
+    EXPERIMENT_STRATEGY: z.enum(["A", "B", "BD"]).default("B"),
     EXPERIMENT_SEED: z.coerce.number().int().default(20261027),
     // `null` = NullLedger (ledger_simulado en MySQL). Solo desarrollo y pruebas.
     LEDGER: z.enum(["fabric", "null"]).default("fabric"),

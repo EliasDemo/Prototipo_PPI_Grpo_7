@@ -2,10 +2,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { EstadoOperacion, EventoAcademico, EventoNuevo, Operacion, PayloadEvento } from "@/modules/eventos/tipos";
 import { ErrorApi } from "@/server/http/respuestas";
-import { esDuplicado, query, transaccion } from "@/server/mysql/pool";
+import { ejecutar, esDuplicado, query, transaccion } from "@/server/mysql/pool";
 
 // Persistencia común de eventos en la base experimental (pool `exp`, usuario app_exp).
-// La comparten NullLedger y, desde F5, las estrategias A y B.
+// La usan todas las estrategias (BD, A, B y NullLedger).
 
 /** DATETIME(3) de MySQL en -05:00 (dateStrings) -> ISO UTC. */
 export const isoDesdeMysql = (s: string) => new Date(`${s.replace(" ", "T")}-05:00`).toISOString();
@@ -27,15 +27,27 @@ export interface FilaEvento {
   op_tx_id: string | null;
 }
 
+/** Lo que cada estrategia guarda junto al evento. */
+export interface MaterialEvento {
+  /** B/BD: HMAC del evento. A: compromiso SHA-256 del contenido sintético anclado. */
+  hmac: string | null;
+  /** B/BD: clave HMAC del evento. A: null. */
+  clave: Buffer | null;
+  /** Bytes de la serialización canónica del payload real. */
+  bytes: number;
+  /** A: el detalle se borra al confirmarse en el ledger. */
+  temporal: boolean;
+}
+
 /**
- * Inserta registro (si es la versión 1), evento, detalle, clave y operación PENDIENTE en
- * una sola transacción. Para versiones > 1 bloquea el registro (SELECT ... FOR UPDATE) y
- * exige que version_actual = versionEsperada.
+ * Bandeja transaccional (outbox): inserta registro (si es la versión 1), evento, detalle, clave y
+ * operación PENDIENTE en una sola transacción. Para versiones > 1 bloquea el registro
+ * (SELECT ... FOR UPDATE) y exige que version_actual = versionEsperada.
  */
 export async function insertarEvento(
-  { evento, registro, idempotencyKey }: EventoNuevo,
+  { evento, registro, idempotencyKey, corridaId }: EventoNuevo,
   versionEsperada: number,
-  firma: { hmac: string; clave: Buffer; bytes: number },
+  m: MaterialEvento,
 ): Promise<{ opId: string }> {
   if (evento.version !== versionEsperada + 1) throw new Error("La versión del evento debe ser versionEsperada + 1");
   const opId = randomUUID();
@@ -45,9 +57,9 @@ export async function insertarEvento(
       if (versionEsperada === 0) {
         if (!registro || registro.registroId !== evento.registroId) throw new Error("CREAR requiere los datos del registro");
         await tx.ejecutar(
-          `INSERT INTO registro (registro_id, tipo, estrategia, origen_tabla, origen_id, version_actual)
-           VALUES (?, ?, ?, ?, ?, 1)`,
-          [registro.registroId, registro.tipo, registro.estrategia, registro.origenTabla, registro.origenId],
+          `INSERT INTO registro (registro_id, tipo, estrategia, origen_tabla, origen_id, version_actual, corrida_id)
+           VALUES (?, ?, ?, ?, ?, 1, ?)`,
+          [registro.registroId, registro.tipo, registro.estrategia, registro.origenTabla, registro.origenId, corridaId ?? null],
         );
       } else {
         const [r] = await tx.query<{ version_actual: number; estado_vigencia: string; estado_detalle: string }>(
@@ -78,16 +90,16 @@ export async function insertarEvento(
          VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 1, ?)`,
         [
           evento.eventoId, evento.registroId, evento.version, evento.operacion, evento.prevEventoId,
-          evento.actor, new Date(evento.fechaExperimental), firma.hmac,
+          evento.actor, new Date(evento.fechaExperimental), m.hmac,
         ],
       );
-      await tx.ejecutar("INSERT INTO evento_detalle (evento_id, payload, temporal, bytes) VALUES (?, ?, FALSE, ?)", [
-        evento.eventoId, JSON.stringify(evento.payload), firma.bytes,
+      await tx.ejecutar("INSERT INTO evento_detalle (evento_id, payload, temporal, bytes) VALUES (?, ?, ?, ?)", [
+        evento.eventoId, JSON.stringify(evento.payload), m.temporal, m.bytes,
       ]);
-      await tx.ejecutar("INSERT INTO evento_clave (evento_id, clave) VALUES (?, ?)", [evento.eventoId, firma.clave]);
+      if (m.clave) await tx.ejecutar("INSERT INTO evento_clave (evento_id, clave) VALUES (?, ?)", [evento.eventoId, m.clave]);
       await tx.ejecutar(
-        "INSERT INTO operacion (op_id, idempotency_key, evento_id, estado) VALUES (?, ?, ?, 'PENDIENTE')",
-        [opId, idempotencyKey, evento.eventoId],
+        "INSERT INTO operacion (op_id, idempotency_key, evento_id, estado, corrida_id) VALUES (?, ?, ?, 'PENDIENTE', ?)",
+        [opId, idempotencyKey, evento.eventoId, corridaId ?? null],
       );
     });
   } catch (e) {
@@ -100,17 +112,70 @@ export async function insertarEvento(
   return { opId };
 }
 
-/** Marca la operación y el evento como confirmados en el ledger. */
-export async function confirmarOperacion(eventoId: string, txId: string): Promise<void> {
+/** La operación sale de la bandeja hacia el ledger. */
+export async function marcarEnviada(eventoId: string): Promise<void> {
+  await ejecutar("exp", "UPDATE operacion SET estado = 'ENVIADA', intentos = intentos + 1, enviada_en = NOW(3) WHERE evento_id = ?", [eventoId]);
+}
+
+/** Confirmada en el ledger (o, en BD, sin ledger). `txId` null en BD. */
+export async function confirmarOperacion(eventoId: string, txId: string | null, codigo = "VALID"): Promise<void> {
   await transaccion("exp", async (tx) => {
     await tx.ejecutar(
-      `UPDATE operacion SET estado = 'CONFIRMADA', intentos = intentos + 1, tx_id = ?,
+      `UPDATE operacion SET estado = 'CONFIRMADA', tx_id = ?, codigo_validacion = ?,
               enviada_en = COALESCE(enviada_en, NOW(3)), confirmada_en = NOW(3)
         WHERE evento_id = ?`,
-      [txId, eventoId],
+      [txId, codigo, eventoId],
     );
     await tx.ejecutar("UPDATE evento SET estado_confirmacion = 'CONFIRMADO' WHERE evento_id = ?", [eventoId]);
   });
+}
+
+/** El ledger rechazó o invalidó la transacción. */
+export async function marcarFallida(eventoId: string, codigo: string, error: string, txId: string | null = null): Promise<void> {
+  await transaccion("exp", async (tx) => {
+    await tx.ejecutar(
+      "UPDATE operacion SET estado = 'FALLIDA', codigo_validacion = ?, error = ?, tx_id = COALESCE(?, tx_id) WHERE evento_id = ?",
+      [codigo.slice(0, 60), error.slice(0, 1000), txId, eventoId],
+    );
+    await tx.ejecutar("UPDATE evento SET estado_confirmacion = 'FALLIDO' WHERE evento_id = ?", [eventoId]);
+  });
+}
+
+/** Commit sin respuesta a tiempo: queda ENVIADA con su txId para la conciliación (F6). */
+export async function anotarTxPendiente(eventoId: string, txId: string, error: string): Promise<void> {
+  await ejecutar("exp", "UPDATE operacion SET tx_id = ?, error = ? WHERE evento_id = ?", [txId, error.slice(0, 1000), eventoId]);
+}
+
+/** Modo A: el detalle temporal se borra cuando el evento ya está en el ledger. */
+export async function borrarDetalleTemporal(eventoId: string): Promise<void> {
+  await ejecutar("exp", "DELETE FROM evento_detalle WHERE evento_id = ? AND temporal = TRUE", [eventoId]);
+}
+
+export interface Medicion {
+  opId: string;
+  corridaId: string | null;
+  estrategia: "A" | "B" | "BD" | "NULL";
+  operacion: Operacion;
+  resultado: "CONFIRMADA" | "FALLIDA" | "TIMEOUT" | "TARDIA" | "RECHAZADA";
+  tMysqlMs: number;
+  tFabricSubmitMs: number | null;
+  tFabricCommitMs: number | null;
+  tTotalMs: number;
+  bytesOnchain: number | null;
+  bytesOffchain: number | null;
+}
+
+/** F5.7: una fila por operación. Nunca hace fallar la solicitud. */
+export async function registrarMedicion(m: Medicion): Promise<void> {
+  const r3 = (n: number | null) => (n === null ? null : Math.round(n * 1000) / 1000);
+  await ejecutar(
+    "exp",
+    `INSERT INTO medicion (corrida_id, op_id, estrategia, operacion, resultado, t_mysql_ms, t_fabric_submit_ms,
+                           t_fabric_commit_ms, t_total_ms, bytes_onchain, bytes_offchain)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [m.corridaId, m.opId, m.estrategia, m.operacion, m.resultado, r3(m.tMysqlMs), r3(m.tFabricSubmitMs), r3(m.tFabricCommitMs),
+      r3(m.tTotalMs), m.bytesOnchain, m.bytesOffchain],
+  ).catch((e) => console.error("[medicion] no se pudo registrar", e));
 }
 
 export async function leerEvento(eventoId: string): Promise<FilaEvento | null> {

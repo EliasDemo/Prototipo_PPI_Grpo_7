@@ -1,7 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Autenticado } from "@/modules/autenticacion/requerir";
-import { env } from "@/server/config/env";
 import { ErrorApi } from "@/server/http/respuestas";
 import { estrategia } from "@/server/storage-strategies";
 import { cambiosAsistencia, cambiosNota, cuerpoCrear, cuerpoRectificar, ESTADOS_ASISTENCIA, uuid } from "./esquemas";
@@ -16,7 +15,7 @@ const actorDe = (a: Autenticado) => a.tipo;
 const ahora = () => new Date().toISOString();
 
 /** Crea una copia de ensayo de una nota o asistencia del origen: registro nuevo + evento CREAR v1. */
-export async function crearCopia(entrada: unknown, auth: Autenticado, idempotencyKey: string): Promise<Confirmacion> {
+export async function crearCopia(entrada: unknown, auth: Autenticado, idempotencyKey: string, corridaId: string | null = null): Promise<Confirmacion> {
   const cuerpo = cuerpoCrear.parse(entrada);
   const payload = await payloadDesdeOrigen(cuerpo);
   if (!payload) throw new ErrorApi("NO_ENCONTRADO", `No existe ${cuerpo.origenId} en el origen`);
@@ -26,11 +25,12 @@ export async function crearCopia(entrada: unknown, auth: Autenticado, idempotenc
   return est.registrar(
     {
       idempotencyKey,
+      corridaId,
       registro: {
         registroId,
         tipo: cuerpo.tipo,
-        // NullLedger tiene la semántica de B. Las estrategias reales se fijan por EXPERIMENT_STRATEGY (F5).
-        estrategia: est.nombre === "NULL" ? "B" : env().EXPERIMENT_STRATEGY,
+        // NullLedger tiene la semántica de B (ADR-010).
+        estrategia: est.nombre === "NULL" ? "B" : est.nombre,
         origenTabla: cuerpo.tipo === "NOTA" ? "calificaciones" : "asistencias",
         origenId: cuerpo.origenId,
       },
@@ -44,7 +44,13 @@ export async function crearCopia(entrada: unknown, auth: Autenticado, idempotenc
 }
 
 /** Rectifica la versión `versionEsperada`: nuevo evento enlazado con el anterior. */
-export async function rectificar(registroId: string, entrada: unknown, auth: Autenticado, idempotencyKey: string): Promise<Confirmacion> {
+export async function rectificar(
+  registroId: string,
+  entrada: unknown,
+  auth: Autenticado,
+  idempotencyKey: string,
+  corridaId: string | null = null,
+): Promise<Confirmacion> {
   if (!uuid.safeParse(registroId).success) throw new ErrorApi("NO_ENCONTRADO", "Registro no encontrado");
   const cuerpo = cuerpoRectificar.parse(entrada);
 
@@ -61,14 +67,18 @@ export async function rectificar(registroId: string, entrada: unknown, auth: Aut
       versionActual: registro.version_actual,
     });
   }
-  if (!base.payload) throw new ErrorApi("REGISTRO_NO_VIGENTE", "El detalle de la versión vigente fue retirado");
+  // Modo A: tras confirmarse, el detalle temporal ya no está en MySQL y el sistema de registro es el ledger.
+  const basePayload =
+    base.payload ?? (registro.estrategia === "A" ? ((await estrategia().obtener(base.evento_id))?.payload ?? null) : null);
+  if (!basePayload) throw new ErrorApi("REGISTRO_NO_VIGENTE", "El detalle de la versión vigente fue retirado");
 
-  const payload = aplicarCambios(base.payload, cuerpo.cambios, cuerpo.motivo);
+  const payload = aplicarCambios(basePayload, cuerpo.cambios, cuerpo.motivo);
 
   // El bloqueo FOR UPDATE y la comprobación definitiva de versión ocurren dentro de registrar().
   return estrategia().registrar(
     {
       idempotencyKey,
+      corridaId,
       evento: {
         eventoId: randomUUID(), registroId, version: cuerpo.versionEsperada + 1, operacion: "RECTIFICAR",
         prevEventoId: base.evento_id, actor: actorDe(auth), fechaExperimental: ahora(), payload,

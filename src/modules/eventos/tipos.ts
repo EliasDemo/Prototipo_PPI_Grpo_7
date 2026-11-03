@@ -2,7 +2,8 @@
 
 export type TipoRegistro = "NOTA" | "ASISTENCIA";
 export type Operacion = "CREAR" | "RECTIFICAR" | "REVOCAR" | "SUPRIMIR";
-export type Estrategia = "A" | "B";
+/** BD = línea base sin ledger (ADR-017). */
+export type Estrategia = "A" | "B" | "BD";
 export type EstadoOperacion = "PENDIENTE" | "ENVIADA" | "CONFIRMADA" | "FALLIDA" | "TARDIA";
 
 /** Texto decimal exacto, p. ej. "18.5000" (DECIMAL(10,4)). Nunca un float. */
@@ -69,6 +70,8 @@ export interface EventoNuevo {
   registro?: RegistroNuevo;
   /** Idempotency-Key de la solicitud; identifica la operación hacia el ledger. */
   idempotencyKey: string;
+  /** Corrida del benchmark (cabecera X-Corrida-Id), si la hay. */
+  corridaId?: string | null;
 }
 
 /** Lo que se ancla en el ledger en modo híbrido (B): sin contenido académico. */
@@ -78,6 +81,9 @@ export interface Evidencia {
   prevId: string | null;
   operacion: Operacion;
   version: number;
+  /** Rol (operador | benchmark), nunca un nombre (ADR-017). */
+  actorRol: string;
+  /** Fecha del ledger: timestamp de la transacción en Fabric (o de inserción en el simulado). */
   fechaExperimental: string;
   /** HMAC-SHA256 (hex) de la serialización canónica del evento. */
   hmac: string;
