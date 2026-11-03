@@ -1,6 +1,11 @@
 #!/bin/bash
 # Se ejecuta UNA sola vez, cuando el volumen de MySQL está vacío.
 # Crea las cuentas separadas que exige el plan (sección 2 y F1.3).
+#
+# Debe ser ejecutable (modo 755): si no lo es, el entrypoint de MySQL lo incluye con `source`
+# y sus opciones de shell se filtran al entrypoint (el servidor temporal no se apaga y MySQL
+# entra en un ciclo de reinicios). Por eso, además, todo corre en un subshell.
+(
 set -euo pipefail
 
 : "${MYSQL_PREP_PASSWORD:?Falta MYSQL_PREP_PASSWORD en .env}"
@@ -31,3 +36,4 @@ FLUSH PRIVILEGES;
 SQL
 
 echo "[init] Usuarios prep, app_ro y app_exp creados."
+)
