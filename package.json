@@ -32,6 +32,8 @@
     "fabric:prueba": "bash infra/fabric/network/prueba-cli.sh"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.7",
+    "@hyperledger/fabric-gateway": "^1.13.0",
     "mysql2": "^3.24.6",
     "next": "16.4.3",
     "react": "19.3.0",
