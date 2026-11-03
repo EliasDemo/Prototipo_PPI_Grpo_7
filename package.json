@@ -25,6 +25,8 @@
     "reconcile": "tsx --conditions=react-server --env-file=.env scripts/reconciliation/conciliar.ts",
     "privacidad:auditar": "tsx --conditions=react-server --env-file=.env scripts/experiments/auditar-privacidad.ts",
     "prueba:interrupcion": "tsx --env-file=.env scripts/experiments/prueba-interrupcion.ts",
+    "bench": "bash benchmarks/caliper/run.sh",
+    "analizar": "python3 scripts/experiments/analisis/analizar.py",
     "test:fabric": "TEST_LEDGER=fabric vitest run --project fabric",
     "latencia:api": "tsx --env-file=.env scripts/experiments/latencia-api.ts",
     "dev:null": "LEDGER=null next dev",

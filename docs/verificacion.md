@@ -32,3 +32,9 @@ Para trabajar sin el dump: `mysql … investigacion_peruschool < tests/soporte/o
 | 7 | Revocación frente a supresión | `tests/fabric/privacidad.test.ts` |
 | 8 | Cero datos prohibidos | `pnpm privacidad:auditar`; repetir con `--nombres` y con los CSV reales |
 | 9 | El origen no cambia | Huella en `tests/soporte/servidor.ts` y `privacidad.test.ts` |
+
+## F8 y F9
+
+- **Interfaz:** recorrido completo en navegador (acceso, datos, académico, crear, rectificar, verificar, suprimir, experimentos, ancho de teléfono) contra la red real.
+- **Benchmark:** `pnpm bench` probado de punta a punta con corridas cortas de humo. Esas corridas validan las herramientas y no son resultados.
+- **Sin probar:** `benchmarks/jmeter/eventos.jmx`, la captura de `docker stats` y el tamaño del ledger con contenedores.

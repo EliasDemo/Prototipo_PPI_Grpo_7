@@ -1,0 +1,5 @@
+# La red real queda detrás de la API; Caliper solo conoce el conector HTTP.
+name: ppi
+version: "2.0"
+caliper:
+  blockchain: connectors/http/index.js

@@ -1,0 +1,6 @@
+{
+  "name": "ppi-benchmark",
+  "private": true,
+  "description": "Hyperledger Caliper con conector HTTP propio (F9). Dependencias separadas de la aplicación.",
+  "dependencies": { "@hyperledger/caliper-cli": "0.6.0", "@hyperledger/caliper-core": "0.6.0" }
+}

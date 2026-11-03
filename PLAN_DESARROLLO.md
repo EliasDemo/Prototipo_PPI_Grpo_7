@@ -383,9 +383,9 @@ Las rutas están en `src/app/(prototipo)/`. Solo consumen la API.
 - **Caliper**: mide los TPS confirmados, la latencia desde el envío hasta la confirmación en el ledger y la tasa de éxito.
 - **JMeter**, en corridas separadas: mide la latencia de extremo a extremo de la API (`POST /api/v1/eventos`).
 
-- [ ] F9.1 Escribir el conector HTTP en `benchmarks/caliper/connectors/http`, que llama a `POST /api/v1/eventos` con el token de benchmark. Una operación solo se cuenta como éxito cuando la respuesta indica `CONFIRMADA`.
-- [ ] F9.2 Definir dos workloads: `notas-2026` y `asistencias-2026`. La selección de registros se hace con una semilla fija, en el mismo orden para A y B. En el modo A, Fabric recibe eventos sintéticos no identificables con la misma estructura y el mismo tamaño que los reales.
-- [ ] F9.3 Crear la matriz en `benchmarks/caliper/config/`:
+- [x] F9.1 Escribir el conector HTTP en `benchmarks/caliper/connectors/http`, que llama a `POST /api/v1/eventos` con el token de benchmark. Una operación solo se cuenta como éxito cuando la respuesta indica `CONFIRMADA`.
+- [x] F9.2 Definir dos workloads: `notas-2026` y `asistencias-2026`. La selección de registros se hace con una semilla fija, en el mismo orden para A y B. En el modo A, Fabric recibe eventos sintéticos no identificables con la misma estructura y el mismo tamaño que los reales.
+- [x] F9.3 Crear la matriz en `benchmarks/caliper/config/`:
 
 | Parámetro | Valores |
 |---|---|
@@ -397,11 +397,11 @@ Las rutas están en `src/app/(prototipo)/`. Solo consumen la API.
 | Cargas de trabajo | notas, asistencias |
 | **Total (candidato)** | 3 × 4 × 2 × 5 = **120 corridas**, unas 8 h de medición más la preparación |
 
-- [ ] F9.4 Escribir `run.sh` para cada corrida: ejecuta `db:reset-exp`, verifica que la red esté sana (`fabric:health`), corre Caliper, ejecuta la conciliación de hasta 90 s y exporta los resultados. El orden de A y B se alterna en cada pareja.
-- [ ] F9.5 Capturar recursos con `docker stats` y el CPU y la memoria del generador; la profundidad de la bandeja transaccional (outbox) durante la corrida; y el tamaño de la base experimental y del ledger antes y después.
+- [x] F9.4 Escribir `run.sh` para cada corrida: ejecuta `db:reset-exp`, verifica que la red esté sana (`fabric:health`), corre Caliper, ejecuta la conciliación de hasta 90 s y exporta los resultados. El orden de A y B se alterna en cada pareja.
+- [x] F9.5 Capturar recursos con `docker stats` y el CPU y la memoria del generador; la profundidad de la bandeja transaccional (outbox) durante la corrida; y el tamaño de la base experimental y del ledger antes y después.
 - [ ] F9.6 Hacer primero un **piloto** (una combinación por estrategia) y fijar con él las cargas y los workers definitivos.
 - [ ] F9.7 Plan de JMeter (`benchmarks/jmeter/`): las mismas cargas, en corridas separadas de las de Caliper.
-- [ ] F9.8 Guardar los resultados en `artifacts/results/<corrida>/` con `config.json` (incluye su hash y el commit de git), `caliper-report.html`, `mediciones.csv` y `recursos.csv`.
+- [x] F9.8 Guardar los resultados en `artifacts/results/<corrida>/` con `config.json` (incluye su hash y el commit de git), `caliper-report.html`, `mediciones.csv` y `recursos.csv`.
 
 **Métricas:** media, p50 y p95 de la latencia; tasa de éxito; dispersión entre repeticiones; CPU y RAM; profundidad de la bandeja transaccional (outbox); tamaño del payload (bytes en el ledger y fuera de él). También se reportan los TPS ofrecidos, enviados y confirmados, y las tasas de error, timeout y confirmación tardía.
 
@@ -411,12 +411,12 @@ Las rutas están en `src/app/(prototipo)/`. Solo consumen la API.
 
 ### F10: Cierre del PPI
 
-- [ ] F10.1 Escribir el notebook o script de análisis en `scripts/experiments/analisis`: medianas por escenario a partir de las 5 repeticiones, sin tratar cada transacción como un experimento independiente.
-- [ ] F10.2 Generar los gráficos de latencia frente a TPS y de throughput confirmado por estrategia.
+- [x] F10.1 Escribir el notebook o script de análisis en `scripts/experiments/analisis`: medianas por escenario a partir de las 5 repeticiones, sin tratar cada transacción como un experimento independiente.
+- [x] F10.2 Generar los gráficos de latencia frente a TPS y de throughput confirmado por estrategia.
 - [ ] F10.3 Escribir `artifacts/reports/informe-evaluacion.md`, incluyendo los resultados desfavorables y los límites.
 - [ ] F10.4 Actualizar el PPI y el short paper con los resultados reales.
 - [ ] F10.5 Escribir el guion de la demo y grabarla.
-- [ ] F10.6 Escribir el README final con la reproducción completa desde cero.
+- [x] F10.6 Escribir el README final con la reproducción completa desde cero.
 
 ---
 
