@@ -7,6 +7,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Caliper carga estos módulos con require (CommonJS).
+    "benchmarks/caliper/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
