@@ -225,4 +225,20 @@ Formato: contexto, decisión y consecuencias. Una decisión no se edita: si camb
 **Consecuencias.**
 - `BatchTimeout` y `MaxMessageCount` condicionan la latencia de confirmación a cargas bajas: con pocas transacciones, el bloque se corta por tiempo. Hay que reportarlos junto a los resultados.
 - Un solo orderer no tolera fallos (Raft con un nodo). Es suficiente para medir A frente a B en igualdad de condiciones, pero no es una configuración de producción.
-- **Pendiente de decisión del equipo:** el short paper menciona el rol del actor en el evento anclado (ADR-015), y `RegistrarEvidencia` no lo admite.
+- **Pendiente de decisión del equipo:** el short paper menciona el rol del actor en el evento anclado (ADR-015), y `RegistrarEvidencia` no lo admite. *(Resuelto en ADR-017.)*
+
+---
+
+## ADR-017 · Línea base sin ledger (BD) y rol del actor en el ledger
+
+**Fecha:** 03/11/2026 · **Estado:** aceptada · **Fase:** F5
+
+**Contexto.** El artículo (RQ3) mide la sobrecarga del anclaje "relative to a database-only baseline". También indica que cada evento anclado incluye el rol del actor. Los dos puntos quedaron pendientes en ADR-015 y ADR-016. El equipo pidió avanzar cumpliendo lo planteado.
+
+**Decisión.**
+- **Estrategia `BD`, la línea base.** Usa la misma API, los mismos casos de uso, la misma idempotencia y la misma bandeja transaccional en MySQL (detalle, clave y HMAC incluidos), pero no ancla en ningún ledger: la operación pasa a `CONFIRMADA` sin enviar nada. Se elige con `EXPERIMENT_STRATEGY=BD` y no requiere Fabric. Su verificación responde `SIN_EVIDENCIA`, porque no hay ledger contra el cual comparar.
+- **Estrategias de la matriz:** `BD`, A y B, con el orden rotado en cada repetición. La matriz candidata de ADR-015 pasa de 80 a 120 corridas (3 × 4 × 2 × 5).
+- **`actorRol` en el ledger:** es un campo obligatorio en `RegistrarEvidencia` y `RegistrarEventoCompleto`, restringido a los códigos `operador` y `benchmark`. El chaincode rechaza cualquier otro valor. La verificación compara `evento.actor` (MySQL) con el `actorRol` anclado. El rol no entra en la firma HMAC (ADR-011 no cambia): queda protegido por el propio ledger.
+- **Migración 004:** `registro.estrategia` y `corrida.estrategia` admiten `BD`, y `medicion` registra la estrategia y la operación aunque no haya corrida (`corrida_id` puede ser NULL; llega en la cabecera `X-Corrida-Id`).
+
+**Consecuencias.** La RQ3 se puede responder comparando A y B contra `BD` con la misma lógica de aplicación. El chaincode quedó desplegado en la versión 2 (secuencia 2).

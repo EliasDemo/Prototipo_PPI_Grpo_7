@@ -20,12 +20,15 @@ const VERSION_MAX = 1000000;
 const OPERACIONES = ['CREAR', 'RECTIFICAR', 'SUPRIMIR'];
 
 /** Motivos de revocación: códigos cerrados, nunca texto libre (no puede contener datos personales). */
+/** Rol de quien origina el evento (ADR-017): código cerrado, nunca un nombre. */
+const ROLES_ACTOR = ['operador', 'benchmark'];
+
 const MOTIVOS_REVOCACION = ['ERROR_DE_REGISTRO', 'DUPLICADO', 'ORDEN_ADMINISTRATIVA', 'SOLICITUD_DEL_TITULAR', 'PRUEBA_DE_LABORATORIO'];
 
 // Modo B: solo estos campos, todos obligatorios.
-const CAMPOS_EVIDENCIA = ['evidenciaId', 'registroOpacoId', 'prevEvidenciaId', 'version', 'operacion', 'hmac', 'schemaVersion'];
+const CAMPOS_EVIDENCIA = ['evidenciaId', 'registroOpacoId', 'prevEvidenciaId', 'version', 'operacion', 'actorRol', 'hmac', 'schemaVersion'];
 // Modo A: el evento sintético completo.
-const CAMPOS_EVENTO = ['evidenciaId', 'registroOpacoId', 'prevEvidenciaId', 'version', 'operacion', 'schemaVersion', 'contenido'];
+const CAMPOS_EVENTO = ['evidenciaId', 'registroOpacoId', 'prevEvidenciaId', 'version', 'operacion', 'actorRol', 'schemaVersion', 'contenido'];
 
 const TAMANO_MAX_EVIDENCIA = 1024;
 // Tamaño máximo (bytes UTF-8) del evento del modo A. Configurable al desplegar (debe ser igual en todos los peers).
@@ -64,6 +67,7 @@ function validarCadena(e) {
   if (typeof e.registroOpacoId !== 'string' || !UUID.test(e.registroOpacoId)) falla('ENTRADA_INVALIDA', 'registroOpacoId debe ser un UUID en minúsculas');
   if (!Number.isInteger(e.version) || e.version < 1 || e.version > VERSION_MAX) falla('ENTRADA_INVALIDA', 'version debe ser un entero >= 1');
   if (!OPERACIONES.includes(e.operacion)) falla('ENTRADA_INVALIDA', `operacion debe ser una de ${OPERACIONES.join(', ')}`);
+  if (!ROLES_ACTOR.includes(e.actorRol)) falla('ENTRADA_INVALIDA', `actorRol debe ser uno de ${ROLES_ACTOR.join(', ')}`);
   if (!SCHEMA_VERSIONS.includes(e.schemaVersion)) falla('ENTRADA_INVALIDA', `schemaVersion no admitida: ${e.schemaVersion}`);
   if (e.version === 1) {
     if (e.prevEvidenciaId !== null) falla('ENCADENAMIENTO', 'la versión 1 no tiene evidencia previa (prevEvidenciaId = null)');
@@ -237,4 +241,4 @@ class Trazabilidad extends Contract {
   }
 }
 
-module.exports = { Trazabilidad, MOTIVOS_REVOCACION, OPERACIONES, CAMPOS_EVIDENCIA, CAMPOS_EVENTO };
+module.exports = { Trazabilidad, ROLES_ACTOR, MOTIVOS_REVOCACION, OPERACIONES, CAMPOS_EVIDENCIA, CAMPOS_EVENTO };

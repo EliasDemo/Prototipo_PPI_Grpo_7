@@ -389,13 +389,13 @@ Las rutas están en `src/app/(prototipo)/`. Solo consumen la API.
 
 | Parámetro | Valores |
 |---|---|
-| Estrategia | A, B (orden alternado en cada pareja) |
+| Estrategia | BD (línea base sin ledger), A y B, orden rotado en cada repetición (ADR-017) |
 | Carga ofrecida (candidata) | 5, 10, 25 y 50 escrituras/s. **Las definitivas se fijan después del piloto** y el cambio se documenta en un ADR |
 | Workers | Se fija en el piloto y se mantiene igual en todas las corridas |
 | Calentamiento / observación | 60 s / 180 s |
 | Repeticiones | 5 |
 | Cargas de trabajo | notas, asistencias |
-| **Total (candidato)** | 2 × 4 × 2 × 5 = **80 corridas**, unas 5 h 20 min de medición más la preparación |
+| **Total (candidato)** | 3 × 4 × 2 × 5 = **120 corridas**, unas 8 h de medición más la preparación |
 
 - [ ] F9.4 Escribir `run.sh` para cada corrida: ejecuta `db:reset-exp`, verifica que la red esté sana (`fabric:health`), corre Caliper, ejecuta la conciliación de hasta 90 s y exporta los resultados. El orden de A y B se alterna en cada pareja.
 - [ ] F9.5 Capturar recursos con `docker stats` y el CPU y la memoria del generador; la profundidad de la bandeja transaccional (outbox) durante la corrida; y el tamaño de la base experimental y del ledger antes y después.

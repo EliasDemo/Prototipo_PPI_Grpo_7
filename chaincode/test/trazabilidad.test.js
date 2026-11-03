@@ -14,10 +14,10 @@ const E3 = 'aaaaaaaa-0000-4000-8000-000000000003';
 const H = (c) => c.repeat(64);
 
 const evidencia = (extra = {}) => ({
-  evidenciaId: E1, registroOpacoId: REG, prevEvidenciaId: null, version: 1, operacion: 'CREAR', hmac: H('a'), schemaVersion: 1, ...extra,
+  evidenciaId: E1, registroOpacoId: REG, prevEvidenciaId: null, version: 1, operacion: 'CREAR', actorRol: 'operador', hmac: H('a'), schemaVersion: 1, ...extra,
 });
 const eventoA = (extra = {}) => ({
-  evidenciaId: E1, registroOpacoId: REG, prevEvidenciaId: null, version: 1, operacion: 'CREAR', schemaVersion: 1,
+  evidenciaId: E1, registroOpacoId: REG, prevEvidenciaId: null, version: 1, operacion: 'CREAR', actorRol: 'benchmark', schemaVersion: 1,
   contenido: { tipo: 'NOTA', anio: 2026, periodoId: 'PER-SINT-1', valorFuente: 'A', valorNumerico: '17.0000', motivo: null },
   ...extra,
 });
@@ -58,6 +58,9 @@ describe('RegistrarEvidencia (modo B)', () => {
     await rechaza(cc.RegistrarEvidencia(ctx, json(evidencia({ evidenciaId: 'no-uuid' }))), 'ENTRADA_INVALIDA');
     await rechaza(cc.RegistrarEvidencia(ctx, json(evidencia({ schemaVersion: 2 }))), 'ENTRADA_INVALIDA');
     await rechaza(cc.RegistrarEvidencia(ctx, json(evidencia({ operacion: 'REVOCAR' }))), 'ENTRADA_INVALIDA');
+    // el actor es un rol cerrado, nunca un nombre
+    await rechaza(cc.RegistrarEvidencia(ctx, json(evidencia({ actorRol: 'Juan Pérez' }))), 'ENTRADA_INVALIDA');
+    await rechaza(cc.RegistrarEvidencia(ctx, json(evidencia({ actorRol: null }))), 'ENTRADA_INVALIDA');
     await rechaza(cc.RegistrarEvidencia(ctx, '{no json'), 'ENTRADA_INVALIDA');
     await rechaza(cc.RegistrarEvidencia(ctx, json([1])), 'ENTRADA_INVALIDA');
   });
