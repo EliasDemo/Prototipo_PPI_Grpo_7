@@ -30,7 +30,8 @@ export default async function setup(project: TestProject) {
     proc = spawn("pnpm", ["exec", "next", "dev", "-p", String(PUERTO)], {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
-      env: { ...process.env, LEDGER: "null", NODE_ENV: "development" },
+      // TEST_LEDGER=fabric: suite tests/fabric contra la red real (F5).
+      env: { ...process.env, LEDGER: process.env.TEST_LEDGER ?? "null", NODE_ENV: "development" },
     });
     let salida = "";
     proc.stdout?.on("data", (d) => (salida += d));

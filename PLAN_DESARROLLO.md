@@ -318,15 +318,15 @@ src/modules/academico/
 
 ### F5: Estrategias A/B integradas
 
-- [ ] F5.1 Crear `src/server/fabric/gateway.ts`: conexión única reutilizable, `submitAsync`, espera de `getStatus()` (commit válido) y timeouts configurables.
-- [ ] F5.2 Crear `src/server/storage-strategies/estrategia-a.ts`: guarda el detalle temporal en MySQL, lo envía completo a Fabric y, al confirmarse, borra el temporal. **En el modo A, lo que llega a Fabric es un evento SINTÉTICO no identificable**, con la misma estructura y el mismo tamaño que el real (ADR-015).
-- [ ] F5.3 Crear `src/server/storage-strategies/estrategia-b.ts`: guarda el detalle y la clave en MySQL, envía solo la evidencia con su HMAC y al confirmarse marca la operación.
-- [ ] F5.4 Crear `src/server/storage-strategies/index.ts`: elige la estrategia según `EXPERIMENT_STRATEGY`, que se fija al arrancar y no cambia durante una corrida.
-- [ ] F5.5 Escribir la verificación (`POST /api/v1/trazabilidad/:eventoId/verificar`):
+- [x] F5.1 Crear `src/server/fabric/gateway.ts`: conexión única reutilizable, `submitAsync`, espera de `getStatus()` (commit válido) y timeouts configurables.
+- [x] F5.2 Crear `src/server/storage-strategies/estrategia-a.ts`: guarda el detalle temporal en MySQL, lo envía completo a Fabric y, al confirmarse, borra el temporal. **En el modo A, lo que llega a Fabric es un evento SINTÉTICO no identificable**, con la misma estructura y el mismo tamaño que el real (ADR-015).
+- [x] F5.3 Crear `src/server/storage-strategies/estrategia-b.ts`: guarda el detalle y la clave en MySQL, envía solo la evidencia con su HMAC y al confirmarse marca la operación.
+- [x] F5.4 Crear `src/server/storage-strategies/index.ts`: elige la estrategia según `EXPERIMENT_STRATEGY`, que se fija al arrancar y no cambia durante una corrida.
+- [x] F5.5 Escribir la verificación (`POST /api/v1/trazabilidad/:eventoId/verificar`):
   - B: recalcula el HMAC del detalle de MySQL y lo compara con Fabric (`OK`, `ALTERADO` o `DETALLE_RETIRADO`).
   - A: compara el contenido de Fabric consigo mismo y con su historial.
-- [ ] F5.6 Escribir una prueba que altere a propósito una fila de `evento_detalle` y compruebe que el resultado es `ALTERADO`.
-- [ ] F5.7 Instrumentar tiempos con `performance.now()` en cada etapa y guardarlos en `medicion`.
+- [x] F5.6 Escribir una prueba que altere a propósito una fila de `evento_detalle` y compruebe que el resultado es `ALTERADO`.
+- [x] F5.7 Instrumentar tiempos con `performance.now()` en cada etapa y guardarlos en `medicion`.
 
 **Cierre:** el ciclo crear, rectificar y verificar funciona en A y en B con la red real.
 

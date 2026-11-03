@@ -29,6 +29,18 @@ export default defineConfig({
           hookTimeout: 120000,
         },
       },
+      {
+        extends: true,
+        test: {
+          name: "fabric",
+          include: ["tests/fabric/**/*.test.ts"],
+          // Red real y estrategia de EXPERIMENT_STRATEGY (BD no necesita red).
+          globalSetup: ["tests/soporte/servidor.ts"],
+          testTimeout: 60000,
+          hookTimeout: 120000,
+          fileParallelism: false,
+        },
+      },
     ],
   },
 });

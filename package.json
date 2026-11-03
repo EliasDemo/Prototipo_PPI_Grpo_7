@@ -22,6 +22,7 @@
     "test": "vitest run --project unit",
     "test:int": "vitest run --project integration",
     "auth:hash": "tsx scripts/auth/hash-password.ts",
+    "test:fabric": "TEST_LEDGER=fabric vitest run --project fabric",
     "latencia:api": "tsx --env-file=.env scripts/experiments/latencia-api.ts",
     "dev:null": "LEDGER=null next dev",
     "fabric:up": "bash infra/fabric/network/up.sh",

@@ -242,3 +242,17 @@ Formato: contexto, decisión y consecuencias. Una decisión no se edita: si camb
 - **Migración 004:** `registro.estrategia` y `corrida.estrategia` admiten `BD`, y `medicion` registra la estrategia y la operación aunque no haya corrida (`corrida_id` puede ser NULL; llega en la cabecera `X-Corrida-Id`).
 
 **Consecuencias.** La RQ3 se puede responder comparando A y B contra `BD` con la misma lógica de aplicación. El chaincode quedó desplegado en la versión 2 (secuencia 2).
+
+---
+
+## ADR-018 · Validación fuera del equipo del experimento
+
+**Fecha:** 03/11/2026 · **Estado:** aceptada · **Fase:** F5 en adelante
+
+**Contexto.** Parte del desarrollo se validó en un contenedor sin el dump real ni acceso a Docker Hub.
+
+**Decisión.**
+- Se valida con Fabric 2.5.16 real (binarios oficiales, chaincode como servicio) y MySQL 8.0 local, con `tests/soporte/origen-sintetico.sql` como origen. Ese archivo no contiene datos del colegio.
+- Esa validación prueba el comportamiento funcional. **No produce mediciones**: sus tiempos no se reportan y `pnpm db:verify` y `tests/integration/academico.test.ts` siguen exigiendo el dump real.
+
+**Consecuencias.** Antes de medir hay que repetir las suites en el equipo del experimento, con MySQL 8.4 y `pnpm fabric:up`. Ver `docs/verificacion.md`.
