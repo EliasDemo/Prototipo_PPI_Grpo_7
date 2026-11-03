@@ -256,3 +256,20 @@ Formato: contexto, decisión y consecuencias. Una decisión no se edita: si camb
 - Esa validación prueba el comportamiento funcional. **No produce mediciones**: sus tiempos no se reportan y `pnpm db:verify` y `tests/integration/academico.test.ts` siguen exigiendo el dump real.
 
 **Consecuencias.** Antes de medir hay que repetir las suites en el equipo del experimento, con MySQL 8.4 y `pnpm fabric:up`. Ver `docs/verificacion.md`.
+
+---
+
+## ADR-019 · Bandeja con mensaje, conciliación y revocación fuera de la cadena de versiones
+
+**Fecha:** 03/11/2026 · **Estado:** aceptada · **Fase:** F6 y F7
+
+**Decisión.**
+- **Mensaje en la bandeja (migración 006).** `operacion` guarda la función y el JSON exactos hacia el ledger, en la misma transacción. Sin esto, A no podría reenviar: su contenido sintético es aleatorio y su compromiso ya está guardado. No contiene datos del conjunto y se vacía al confirmarse.
+- **Una versión solo se encadena sobre otra confirmada.** Si la anterior sigue en la bandeja, responde 409 `CONFLICTO`, porque el chaincode rechazaría la siguiente versión.
+- **Reintentos (F6.3).** `OUTBOX_MAX_INTENTOS` (3) y `OUTBOX_BACKOFF_MS` (200, se duplica) solo para fallas de red y conflictos MVCC. Un rechazo del chaincode no se repite. Un timeout de commit lo resuelve la conciliación.
+- **`TARDIA`:** la solicitud se quedó sin respuesta de commit y luego el ledger mostró la transacción. Tras un corte del proceso, si el ledger la tiene, es `CONFIRMADA`.
+- **Revocación:** tabla `revocacion`, sin ocupar una versión, igual que en el ledger (ADR-016). El plan pedía "un evento REVOCAR": se cambia para que MySQL y el ledger numeren igual y SUPRIMIR pueda encadenarse.
+- **SUPRIMIR:** el HMAC anclado usa una clave de un solo uso que no se guarda, porque el chaincode exige el campo y no hay contenido que firmar.
+- **Inyección de fallos:** `FALLO_INYECTADO`, ignorada con `NODE_ENV=production`.
+
+**Consecuencias.** La bandeja escribe un poco más por operación en A y B, y eso forma parte de lo que se mide. Si una versión termina `FALLIDA`, el registro queda sin poder avanzar: es deliberado y requiere revisión manual.

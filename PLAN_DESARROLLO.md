@@ -334,11 +334,11 @@ src/modules/academico/
 
 ### F6: Consistencia y recuperación
 
-- [ ] F6.1 **Bandeja transaccional (outbox)**: la operación se registra como `PENDIENTE` en la misma transacción de MySQL que el cambio académico; luego se ancla en Fabric, se espera el commit, y finalmente se marca `CONFIRMADA` en una transacción local. La profundidad de la bandeja (operaciones `PENDIENTE` o `ENVIADA`) es una métrica del experimento.
-- [ ] F6.2 Idempotencia: la misma `Idempotency-Key` devuelve el mismo `evento_id` y el mismo contenido. En Fabric, un ID repetido se considera "ya confirmado" y no un error.
-- [ ] F6.3 Reintentos con backoff exponencial y un máximo configurable.
-- [ ] F6.4 Escribir `scripts/reconciliation/conciliar.ts`: recorre las operaciones `PENDIENTE` o `ENVIADA` con más de N segundos, consulta Fabric y marca cada una como `CONFIRMADA`, `TARDIA` o `FALLIDA`.
-- [ ] F6.5 Prueba de interrupción: matar el proceso entre el envío y la confirmación, ejecutar `pnpm reconcile` y comprobar que el estado es consistente y sin duplicados.
+- [x] F6.1 **Bandeja transaccional (outbox)**: la operación se registra como `PENDIENTE` en la misma transacción de MySQL que el cambio académico; luego se ancla en Fabric, se espera el commit, y finalmente se marca `CONFIRMADA` en una transacción local. La profundidad de la bandeja (operaciones `PENDIENTE` o `ENVIADA`) es una métrica del experimento.
+- [x] F6.2 Idempotencia: la misma `Idempotency-Key` devuelve el mismo `evento_id` y el mismo contenido. En Fabric, un ID repetido se considera "ya confirmado" y no un error.
+- [x] F6.3 Reintentos con backoff exponencial y un máximo configurable.
+- [x] F6.4 Escribir `scripts/reconciliation/conciliar.ts`: recorre las operaciones `PENDIENTE` o `ENVIADA` con más de N segundos, consulta Fabric y marca cada una como `CONFIRMADA`, `TARDIA` o `FALLIDA`.
+- [x] F6.5 Prueba de interrupción: matar el proceso entre el envío y la confirmación, ejecutar `pnpm reconcile` y comprobar que el estado es consistente y sin duplicados.
 
 **Cierre:** las pruebas de reintento, versión desactualizada e interrupción pasan.
 
@@ -346,15 +346,15 @@ src/modules/academico/
 
 ### F7: Revocación y supresión
 
-- [ ] F7.1 `POST /api/v1/eventos/:registroId/revocaciones`: agrega un evento `REVOCAR` y cambia la vigencia, en ambos modos.
-- [ ] F7.2 `POST /api/v1/privacidad/:registroId/supresion`, solo en modo B:
+- [x] F7.1 `POST /api/v1/eventos/:registroId/revocaciones`: agrega un evento `REVOCAR` y cambia la vigencia, en ambos modos.
+- [x] F7.2 `POST /api/v1/privacidad/:registroId/supresion`, solo en modo B:
   - Borra `evento_detalle` y `evento_clave` de **todas** las versiones del registro.
   - Elimina el vínculo `registro.origen_ref`.
   - Registra un evento `SUPRIMIR` en Fabric, sin datos personales.
   - Desde ese momento, verificar devuelve `DETALLE_RETIRADO`.
-- [ ] F7.3 En modo A, la misma solicitud responde 409 con `SUPRESION_NO_SOPORTADA`. Una prueba demuestra que el contenido sigue legible en Fabric después de revocar.
-- [ ] F7.4 Escribir `scripts/experiments/auditar-privacidad.ts`: busca en el ledger y en los CSV exportados patrones de nombres, códigos originales y claves. Debe reportar cero coincidencias.
-- [ ] F7.5 Documentar los límites: no hay eliminación de respaldos, logs de Docker ni archivos originales, y esto no certifica cumplimiento del GDPR.
+- [x] F7.3 En modo A, la misma solicitud responde 409 con `SUPRESION_NO_SOPORTADA`. Una prueba demuestra que el contenido sigue legible en Fabric después de revocar.
+- [x] F7.4 Escribir `scripts/experiments/auditar-privacidad.ts`: busca en el ledger y en los CSV exportados patrones de nombres, códigos originales y claves. Debe reportar cero coincidencias.
+- [x] F7.5 Documentar los límites: no hay eliminación de respaldos, logs de Docker ni archivos originales, y esto no certifica cumplimiento del GDPR.
 
 **Cierre:** las 9 pruebas funcionales obligatorias (sección 6) pasan.
 

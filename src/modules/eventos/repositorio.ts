@@ -46,7 +46,7 @@ export async function payloadDesdeOrigen(c: CuerpoCrear): Promise<PayloadEvento 
 export interface FilaRegistro {
   registro_id: string;
   tipo: TipoRegistro;
-  estrategia: "A" | "B";
+  estrategia: "A" | "B" | "BD";
   origen_tabla: string | null;
   origen_id: string | null;
   estado_vigencia: "VIGENTE" | "REVOCADO";
@@ -68,6 +68,15 @@ export async function eventoEnVersion(registroId: string, version: number) {
     [registroId, version],
   );
   return f ?? null;
+}
+
+export async function leerRevocacion(registroId: string) {
+  const [f] = await query<{ evidencia_id: string; motivo_codigo: string; estado: string; tx_id: string | null; creada_en: string }>(
+    "exp",
+    "SELECT evidencia_id, motivo_codigo, estado, tx_id, creada_en FROM revocacion WHERE registro_id = ?",
+    [registroId],
+  );
+  return f ? { evidenciaId: f.evidencia_id, motivoCodigo: f.motivo_codigo, estado: f.estado, txId: f.tx_id, fecha: isoDesdeMysql(f.creada_en) } : null;
 }
 
 export interface EslabonCadena {

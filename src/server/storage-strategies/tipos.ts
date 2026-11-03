@@ -26,9 +26,29 @@ export interface StorageStrategy {
   /** null si el evento no existe. */
   verificar(eventoId: string): Promise<Verificacion | null>;
 
-  /** F7. */
-  revocar(eventoId: string, motivo: string): Promise<Confirmacion>;
+  /** F7. Agrega la revocación sobre la versión vigente, sin borrar nada. */
+  revocar(s: SolicitudRevocacion): Promise<Confirmacion>;
 
-  /** F7, solo B. */
-  suprimir?(registroId: string): Promise<ResultadoSupresion>;
+  /** F7, solo B (y NullLedger, que tiene su semántica). */
+  suprimir?(s: SolicitudSupresion): Promise<ResultadoSupresion>;
+}
+
+export interface SolicitudRevocacion {
+  registroId: string;
+  evidenciaId: string;
+  version: number;
+  motivoCodigo: string;
+  actor: string;
+  idempotencyKey: string;
+  corridaId: string | null;
+}
+
+export interface SolicitudSupresion {
+  registroId: string;
+  /** Versión vigente y su evento: SUPRIMIR se encadena sobre ellos. */
+  version: number;
+  prevEventoId: string;
+  actor: string;
+  idempotencyKey: string;
+  corridaId: string | null;
 }

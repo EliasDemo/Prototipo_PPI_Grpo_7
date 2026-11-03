@@ -20,6 +20,11 @@ export const cuerpoRectificar = z
   })
   .strict();
 
+export const MOTIVOS_REVOCACION = ["ERROR_DE_REGISTRO", "DUPLICADO", "ORDEN_ADMINISTRATIVA", "SOLICITUD_DEL_TITULAR", "PRUEBA_DE_LABORATORIO"] as const;
+
+// Código cerrado, igual que en el chaincode: nunca texto libre.
+export const cuerpoRevocar = z.object({ motivoCodigo: z.enum(MOTIVOS_REVOCACION) }).strict();
+
 export const cambiosNota = z
   .object({
     valorFuente: z.string().min(1).max(40).nullable().optional(),

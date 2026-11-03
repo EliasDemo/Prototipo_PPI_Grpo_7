@@ -9,3 +9,26 @@
 ## Origen sintético
 
 Para trabajar sin el dump: `mysql … investigacion_peruschool < tests/soporte/origen-sintetico.sql`. Sus conteos son otros, así que `pnpm db:verify` y `academico.test.ts` no aplican, y nada de lo medido con él vale como resultado.
+
+## F6 y F7
+
+| Prueba | Comando |
+|---|---|
+| Interrupción entre MySQL y el ledger | `EXPERIMENT_STRATEGY=B pnpm prueba:interrupcion` (también `A` y `BD`) |
+| Revocación, supresión y consistencia | `EXPERIMENT_STRATEGY=B pnpm test:fabric` (también `A` y `BD`) |
+| Conciliación manual | `pnpm reconcile --antiguedad=60` |
+| Datos prohibidos | `pnpm privacidad:auditar` |
+
+## Pruebas obligatorias (sección 6 del plan)
+
+| # | Prueba | Dónde |
+|---|---|---|
+| 1 | Importación coincide | `pnpm db:verify` (exige el dump real) |
+| 2 | Registro y consulta en A y B | `tests/fabric/estrategias.test.ts` |
+| 3 | Alteración detectada | `tests/fabric/estrategias.test.ts` |
+| 4 | Secuencia de versiones | `tests/integration/eventos.test.ts` |
+| 5 | Reintento y versión vieja | `tests/fabric/privacidad.test.ts` |
+| 6 | Interrupción | `pnpm prueba:interrupcion` |
+| 7 | Revocación frente a supresión | `tests/fabric/privacidad.test.ts` |
+| 8 | Cero datos prohibidos | `pnpm privacidad:auditar`; repetir con `--nombres` y con los CSV reales |
+| 9 | El origen no cambia | Huella en `tests/soporte/servidor.ts` y `privacidad.test.ts` |

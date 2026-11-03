@@ -121,4 +121,5 @@ export interface ResultadoSupresion {
   versionesAfectadas: number;
   detallesEliminados: number;
   clavesEliminadas: number;
+  confirmacion: Confirmacion;
 }

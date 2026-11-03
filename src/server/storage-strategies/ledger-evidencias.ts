@@ -12,6 +12,8 @@ import type { Anclaje } from "./outbox";
 export interface LedgerEvidencias {
   anclar(e: Evidencia): Promise<Anclaje>;
   obtener(evidenciaId: string): Promise<Evidencia | null>;
+  /** Idempotente: repetir el mismo motivo no es un error. */
+  revocar(evidenciaId: string, motivoCodigo: string): Promise<Anclaje>;
 }
 
 /** JSON exacto que recibe RegistrarEvidencia: solo los campos que admite el chaincode. */
@@ -28,12 +30,21 @@ export function jsonEvidencia(e: Evidencia): string {
   });
 }
 
+export async function revocarEnFabric(id: string, motivoCodigo: string): Promise<Anclaje> {
+  const r = await enviar("Revocar", id, motivoCodigo);
+  return { txId: r.txId, confirmada: r.confirmada, codigo: r.codigo, msSubmit: r.msSubmit, msCommit: r.msCommit, bytesOnchain: Buffer.byteLength(id + motivoCodigo) };
+}
+
 /** Fabric: chaincode `trazabilidad`, RegistrarEvidencia / ObtenerEvidencia. */
 export class LedgerFabric implements LedgerEvidencias {
   async anclar(e: Evidencia): Promise<Anclaje> {
     const json = jsonEvidencia(e);
     const r = await enviar("RegistrarEvidencia", json);
     return { txId: r.txId, confirmada: r.confirmada, codigo: r.codigo, msSubmit: r.msSubmit, msCommit: r.msCommit, bytesOnchain: Buffer.byteLength(json) };
+  }
+
+  async revocar(id: string, motivoCodigo: string): Promise<Anclaje> {
+    return revocarEnFabric(id, motivoCodigo);
   }
 
   async obtener(id: string): Promise<Evidencia | null> {
@@ -77,6 +88,13 @@ export class LedgerTablaSimulada implements LedgerEvidencias {
       if (previa?.hmac !== e.hmac) throw new ErrorLedger("CONFLICTO", `la evidencia ${e.evidenciaId} ya existe con otro contenido`);
     }
     return { txId, confirmada: true, codigo: "VALID", msSubmit: performance.now() - t0, msCommit: 0, bytesOnchain: Buffer.byteLength(json) };
+  }
+
+  async revocar(id: string, motivoCodigo: string): Promise<Anclaje> {
+    const txId = createHash("sha256").update(canonical({ id, motivoCodigo })).digest("hex");
+    const t0 = performance.now();
+    await ejecutar("exp", "INSERT IGNORE INTO ledger_simulado_revocacion (evidencia_id, motivo_codigo, tx_id) VALUES (?, ?, ?)", [id, motivoCodigo, txId]);
+    return { txId, confirmada: true, codigo: "VALID", msSubmit: performance.now() - t0, msCommit: 0, bytesOnchain: Buffer.byteLength(id + motivoCodigo) };
   }
 
   async obtener(id: string): Promise<Evidencia | null> {

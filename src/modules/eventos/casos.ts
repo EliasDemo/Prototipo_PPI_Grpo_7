@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import type { Autenticado } from "@/modules/autenticacion/requerir";
 import { ErrorApi } from "@/server/http/respuestas";
 import { estrategia } from "@/server/storage-strategies";
-import { cambiosAsistencia, cambiosNota, cuerpoCrear, cuerpoRectificar, ESTADOS_ASISTENCIA, uuid } from "./esquemas";
-import { cadenaDeVersiones, eventoEnVersion, leerRegistro, payloadDesdeOrigen } from "./repositorio";
-import type { Confirmacion, EventoConEvidencia, PayloadEvento, Verificacion } from "./tipos";
+import { cambiosAsistencia, cambiosNota, cuerpoCrear, cuerpoRectificar, cuerpoRevocar, ESTADOS_ASISTENCIA, uuid } from "./esquemas";
+import { cadenaDeVersiones, eventoEnVersion, leerRegistro, leerRevocacion, payloadDesdeOrigen } from "./repositorio";
+import type { Confirmacion, EventoConEvidencia, PayloadEvento, ResultadoSupresion, Verificacion } from "./tipos";
 
 // Casos de uso del modelo de eventos (F3.5). La idempotencia se aplica en la capa HTTP.
 
@@ -102,6 +102,41 @@ function aplicarCambios(base: PayloadEvento, cambios: Record<string, unknown>, m
   return nuevo;
 }
 
+/** Registro de la estrategia en curso, con su versión vigente. */
+async function registroParaCambio(registroId: string) {
+  const registro = uuid.safeParse(registroId).success ? await leerRegistro(registroId) : null;
+  if (!registro) throw new ErrorApi("NO_ENCONTRADO", "Registro no encontrado");
+  const est = estrategia();
+  if (registro.estrategia !== (est.nombre === "NULL" ? "B" : est.nombre)) {
+    throw new ErrorApi("CONFLICTO", `El registro pertenece a la estrategia ${registro.estrategia}; el servidor corre ${est.nombre}`);
+  }
+  const vigente = await eventoEnVersion(registroId, registro.version_actual);
+  if (!vigente) throw new Error(`Registro ${registroId} sin evento en su versión actual`);
+  return { est, registro, vigente };
+}
+
+/** F7.1: revoca la versión vigente. En el ledger queda un registro aparte; nada se borra. */
+export async function revocar(registroId: string, entrada: unknown, auth: Autenticado, idempotencyKey: string, corridaId: string | null = null): Promise<Confirmacion> {
+  const { motivoCodigo } = cuerpoRevocar.parse(entrada);
+  const { est, registro, vigente } = await registroParaCambio(registroId);
+  return est.revocar({
+    registroId, evidenciaId: vigente.evento_id, version: registro.version_actual, motivoCodigo,
+    actor: actorDe(auth), idempotencyKey, corridaId,
+  });
+}
+
+/** F7.2 y F7.3: solo la estrategia híbrida puede retirar el detalle. */
+export async function suprimir(registroId: string, auth: Autenticado, idempotencyKey: string, corridaId: string | null = null): Promise<ResultadoSupresion> {
+  const { est, registro, vigente } = await registroParaCambio(registroId);
+  if (!est.suprimir) {
+    throw new ErrorApi("SUPRESION_NO_SOPORTADA", `La estrategia ${est.nombre} no admite supresión: use la revocación`);
+  }
+  return est.suprimir({
+    registroId, version: registro.version_actual, prevEventoId: vigente.evento_id,
+    actor: actorDe(auth), idempotencyKey, corridaId,
+  });
+}
+
 export async function obtenerEvento(eventoId: string): Promise<EventoConEvidencia> {
   const r = uuid.safeParse(eventoId).success ? await estrategia().obtener(eventoId) : null;
   if (!r) throw new ErrorApi("NO_ENCONTRADO", "Evento no encontrado");
@@ -118,7 +153,7 @@ export async function verificarEvento(eventoId: string): Promise<Verificacion> {
 export async function trazabilidad(registroId: string) {
   const registro = uuid.safeParse(registroId).success ? await leerRegistro(registroId) : null;
   if (!registro) throw new ErrorApi("NO_ENCONTRADO", "Registro no encontrado");
-  const cadena = await cadenaDeVersiones(registroId);
+  const [cadena, revocacion] = await Promise.all([cadenaDeVersiones(registroId), leerRevocacion(registroId)]);
   const enlacesValidos = cadena.every(
     (e, i) => e.version === i + 1 && e.prevEventoId === (i === 0 ? null : cadena[i - 1]!.eventoId),
   );
@@ -133,6 +168,7 @@ export async function trazabilidad(registroId: string) {
       versionActual: registro.version_actual,
     },
     cadena,
+    revocacion,
     enlacesValidos: enlacesValidos && cadena.length === registro.version_actual,
   };
 }

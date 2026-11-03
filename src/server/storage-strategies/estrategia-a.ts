@@ -3,12 +3,12 @@ import { createHash } from "node:crypto";
 import type { Confirmacion, EventoConEvidencia, EventoNuevo, PayloadEvento, Verificacion } from "@/modules/eventos/tipos";
 import { canonical, SCHEMA_VERSION } from "@/server/crypto/canonical";
 import { consultar, enviar, ErrorLedger } from "@/server/fabric/gateway";
-import { ErrorApi } from "@/server/http/respuestas";
+import { revocarEnFabric } from "./ledger-evidencias";
 import { bytesFirmados } from "./firma";
-import { registrarConOutbox } from "./outbox";
+import { registrarConOutbox, revocarConOutbox } from "./outbox";
 import { aEventoAcademico, borrarDetalleTemporal, leerEvento } from "./persistencia-mysql";
 import { sintetizar } from "./sintetico";
-import type { StorageStrategy } from "./tipos";
+import type { SolicitudRevocacion, StorageStrategy } from "./tipos";
 
 // Estrategia A (referencia, F5.2): el evento completo vive en el ledger. En el experimento, lo que
 // se ancla es un evento SINTÉTICO no identificable con la misma estructura y tamaño que el real
@@ -60,7 +60,10 @@ export class EstrategiaA implements StorageStrategy {
       estrategia: "A",
       nuevo,
       versionEsperada,
-      material: { hmac: sha256(contenido), clave: null, bytes: bytesFirmados(evento).length, temporal: true },
+      material: {
+        hmac: sha256(contenido), clave: null, bytes: bytesFirmados(evento).length, temporal: true,
+        mensaje: { funcion: "RegistrarEventoCompleto", json },
+      },
       anclar: async () => {
         const r = await enviar("RegistrarEventoCompleto", json);
         return { txId: r.txId, confirmada: r.confirmada, codigo: r.codigo, msSubmit: r.msSubmit, msCommit: r.msCommit, bytesOnchain: Buffer.byteLength(json) };
@@ -105,7 +108,8 @@ export class EstrategiaA implements StorageStrategy {
       : { eventoId, resultado: "OK", detalles: ["metadatos, rol y compromiso del contenido coinciden con el ledger"] };
   }
 
-  async revocar(): Promise<Confirmacion> {
-    throw new ErrorApi("NO_DISPONIBLE", "La revocación llega en F7");
+  // No hay suprimir(): en A el contenido queda en el ledger; revocar no lo vuelve ilegible (F7.3).
+  async revocar(s: SolicitudRevocacion): Promise<Confirmacion> {
+    return revocarConOutbox("A", s, () => revocarEnFabric(s.evidenciaId, s.motivoCodigo));
   }
 }

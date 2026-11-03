@@ -1,8 +1,8 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import type { EstadoOperacion, EventoAcademico, EventoNuevo, Operacion, PayloadEvento } from "@/modules/eventos/tipos";
+import type { EstadoOperacion, EventoAcademico, EventoNuevo, Operacion, PayloadEvento, ResultadoSupresion } from "@/modules/eventos/tipos";
 import { ErrorApi } from "@/server/http/respuestas";
-import { ejecutar, esDuplicado, query, transaccion } from "@/server/mysql/pool";
+import { ejecutar, esDuplicado, query, transaccion, type Transaccion } from "@/server/mysql/pool";
 
 // Persistencia común de eventos en la base experimental (pool `exp`, usuario app_exp).
 // La usan todas las estrategias (BD, A, B y NullLedger).
@@ -37,6 +37,13 @@ export interface MaterialEvento {
   bytes: number;
   /** A: el detalle se borra al confirmarse en el ledger. */
   temporal: boolean;
+  /** Mensaje exacto hacia el ledger, para reenviarlo tras una interrupción. null en BD. */
+  mensaje: MensajeLedger | null;
+}
+
+export interface MensajeLedger {
+  funcion: "RegistrarEvidencia" | "RegistrarEventoCompleto";
+  json: string;
 }
 
 /**
@@ -76,11 +83,7 @@ export async function insertarEvento(
             versionActual: r.version_actual,
           });
         }
-        const [prev] = await tx.query<{ evento_id: string }>(
-          "SELECT evento_id FROM evento WHERE registro_id = ? AND version = ?",
-          [evento.registroId, versionEsperada],
-        );
-        if (prev?.evento_id !== evento.prevEventoId) throw new Error("prevEventoId no corresponde a la versión esperada");
+        await exigirPreviaConfirmada(tx, evento.registroId, versionEsperada, evento.prevEventoId);
         await tx.ejecutar("UPDATE registro SET version_actual = ? WHERE registro_id = ?", [evento.version, evento.registroId]);
       }
 
@@ -98,8 +101,8 @@ export async function insertarEvento(
       ]);
       if (m.clave) await tx.ejecutar("INSERT INTO evento_clave (evento_id, clave) VALUES (?, ?)", [evento.eventoId, m.clave]);
       await tx.ejecutar(
-        "INSERT INTO operacion (op_id, idempotency_key, evento_id, estado, corrida_id) VALUES (?, ?, ?, 'PENDIENTE', ?)",
-        [opId, idempotencyKey, evento.eventoId, corridaId ?? null],
+        "INSERT INTO operacion (op_id, idempotency_key, evento_id, funcion_ledger, mensaje_ledger, estado, corrida_id) VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?)",
+        [opId, idempotencyKey, evento.eventoId, m.mensaje?.funcion ?? null, m.mensaje?.json ?? null, corridaId ?? null],
       );
     });
   } catch (e) {
@@ -112,19 +115,120 @@ export async function insertarEvento(
   return { opId };
 }
 
+/** El ledger exige la cadena en orden: no se encadena sobre una versión aún sin confirmar. */
+async function exigirPreviaConfirmada(tx: Transaccion, registroId: string, version: number, prevEventoId: string | null) {
+  const [prev] = await tx.query<{ evento_id: string; estado: EstadoOperacion | null }>(
+    `SELECT e.evento_id, o.estado FROM evento e LEFT JOIN operacion o ON o.evento_id = e.evento_id
+      WHERE e.registro_id = ? AND e.version = ?`,
+    [registroId, version],
+  );
+  if (prev?.evento_id !== prevEventoId) throw new Error("prevEventoId no corresponde a la versión esperada");
+  if (prev?.estado !== "CONFIRMADA" && prev?.estado !== "TARDIA") {
+    throw new ErrorApi("CONFLICTO", "La versión anterior aún no está confirmada en el ledger; concilie y reintente", { estado: prev?.estado ?? null });
+  }
+}
+
+/**
+ * Supresión (F7.2), en una sola transacción: borra detalle y clave de TODAS las versiones, elimina
+ * el vínculo con el origen, agrega el evento SUPRIMIR y su operación PENDIENTE.
+ */
+export async function insertarSupresion(
+  evento: EventoAcademico,
+  m: { hmac: string; mensaje: MensajeLedger | null; idempotencyKey: string; corridaId: string | null },
+): Promise<{ opId: string; resultado: Omit<ResultadoSupresion, "confirmacion"> }> {
+  const opId = randomUUID();
+  const resultado = await transaccion("exp", async (tx) => {
+    const [r] = await tx.query<{ version_actual: number; estado_detalle: string }>(
+      "SELECT version_actual, estado_detalle FROM registro WHERE registro_id = ? FOR UPDATE",
+      [evento.registroId],
+    );
+    if (!r) throw new ErrorApi("NO_ENCONTRADO", "Registro no encontrado");
+    if (r.estado_detalle === "RETIRADO") throw new ErrorApi("REGISTRO_NO_VIGENTE", "El detalle de este registro ya fue retirado");
+    if (r.version_actual !== evento.version - 1) {
+      throw new ErrorApi("VERSION_DESACTUALIZADA", "El registro cambió durante la supresión", { versionActual: r.version_actual });
+    }
+    await exigirPreviaConfirmada(tx, evento.registroId, r.version_actual, evento.prevEventoId);
+
+    const detalles = await tx.ejecutar(
+      "DELETE d FROM evento_detalle d JOIN evento e ON e.evento_id = d.evento_id WHERE e.registro_id = ?",
+      [evento.registroId],
+    );
+    const claves = await tx.ejecutar(
+      "DELETE k FROM evento_clave k JOIN evento e ON e.evento_id = k.evento_id WHERE e.registro_id = ?",
+      [evento.registroId],
+    );
+    await tx.ejecutar(
+      "UPDATE registro SET origen_tabla = NULL, origen_id = NULL, estado_detalle = 'RETIRADO', version_actual = ? WHERE registro_id = ?",
+      [evento.version, evento.registroId],
+    );
+    await tx.ejecutar(
+      `INSERT INTO evento (evento_id, registro_id, version, operacion, prev_evento_id, actor, motivo, fecha_experimental, schema_version, hmac)
+       VALUES (?, ?, ?, 'SUPRIMIR', ?, ?, NULL, ?, 1, ?)`,
+      [evento.eventoId, evento.registroId, evento.version, evento.prevEventoId, evento.actor, new Date(evento.fechaExperimental), m.hmac],
+    );
+    await tx.ejecutar(
+      "INSERT INTO operacion (op_id, idempotency_key, evento_id, funcion_ledger, mensaje_ledger, estado, corrida_id) VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?)",
+      [opId, m.idempotencyKey, evento.eventoId, m.mensaje?.funcion ?? null, m.mensaje?.json ?? null, m.corridaId],
+    );
+    await tx.ejecutar(
+      `INSERT INTO supresion (supresion_id, registro_id, evento_suprimir_id, versiones_afectadas, detalles_eliminados, claves_eliminadas, completada_en)
+       VALUES (?, ?, ?, ?, ?, ?, NOW(3))`,
+      [randomUUID(), evento.registroId, evento.eventoId, r.version_actual, detalles.affectedRows, claves.affectedRows],
+    );
+    return {
+      registroId: evento.registroId, versionesAfectadas: r.version_actual,
+      detallesEliminados: detalles.affectedRows, clavesEliminadas: claves.affectedRows,
+    };
+  });
+  return { opId, resultado };
+}
+
+/** Revocación (F7.1): cambia la vigencia y deja la revocación PENDIENTE en una transacción. */
+export async function insertarRevocacion(d: {
+  revocacionId: string; registroId: string; evidenciaId: string; motivoCodigo: string; actor: string;
+  idempotencyKey: string; corridaId: string | null;
+}): Promise<void> {
+  await transaccion("exp", async (tx) => {
+    const [r] = await tx.query<{ version_actual: number; estado_vigencia: string; estado_detalle: string }>(
+      "SELECT version_actual, estado_vigencia, estado_detalle FROM registro WHERE registro_id = ? FOR UPDATE",
+      [d.registroId],
+    );
+    if (!r) throw new ErrorApi("NO_ENCONTRADO", "Registro no encontrado");
+    if (r.estado_vigencia !== "VIGENTE" || r.estado_detalle !== "PRESENTE") {
+      throw new ErrorApi("REGISTRO_NO_VIGENTE", "El registro ya está revocado o su detalle fue retirado");
+    }
+    await exigirPreviaConfirmada(tx, d.registroId, r.version_actual, d.evidenciaId);
+    await tx.ejecutar("UPDATE registro SET estado_vigencia = 'REVOCADO' WHERE registro_id = ?", [d.registroId]);
+    await tx.ejecutar(
+      `INSERT INTO revocacion (revocacion_id, registro_id, evidencia_id, motivo_codigo, actor, corrida_id, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [d.revocacionId, d.registroId, d.evidenciaId, d.motivoCodigo, d.actor, d.corridaId, d.idempotencyKey],
+    );
+  });
+}
+
+export async function actualizarRevocacion(id: string, estado: "ENVIADA" | "CONFIRMADA" | "FALLIDA", txId: string | null, error: string | null = null) {
+  await ejecutar(
+    "exp",
+    `UPDATE revocacion SET estado = ?, tx_id = COALESCE(?, tx_id), error = ?, intentos = intentos + (? = 'ENVIADA'),
+            confirmada_en = IF(? = 'CONFIRMADA', NOW(3), confirmada_en) WHERE revocacion_id = ?`,
+    [estado, txId, error?.slice(0, 1000) ?? null, estado, estado, id],
+  );
+}
+
 /** La operación sale de la bandeja hacia el ledger. */
 export async function marcarEnviada(eventoId: string): Promise<void> {
   await ejecutar("exp", "UPDATE operacion SET estado = 'ENVIADA', intentos = intentos + 1, enviada_en = NOW(3) WHERE evento_id = ?", [eventoId]);
 }
 
 /** Confirmada en el ledger (o, en BD, sin ledger). `txId` null en BD. */
-export async function confirmarOperacion(eventoId: string, txId: string | null, codigo = "VALID"): Promise<void> {
+export async function confirmarOperacion(eventoId: string, txId: string | null, codigo = "VALID", estado: "CONFIRMADA" | "TARDIA" = "CONFIRMADA"): Promise<void> {
   await transaccion("exp", async (tx) => {
     await tx.ejecutar(
-      `UPDATE operacion SET estado = 'CONFIRMADA', tx_id = ?, codigo_validacion = ?,
+      `UPDATE operacion SET estado = ?, tx_id = ?, codigo_validacion = ?, mensaje_ledger = NULL, error = NULL,
               enviada_en = COALESCE(enviada_en, NOW(3)), confirmada_en = NOW(3)
         WHERE evento_id = ?`,
-      [txId, codigo, eventoId],
+      [estado, txId, codigo, eventoId],
     );
     await tx.ejecutar("UPDATE evento SET estado_confirmacion = 'CONFIRMADO' WHERE evento_id = ?", [eventoId]);
   });

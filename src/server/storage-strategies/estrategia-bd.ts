@@ -1,11 +1,10 @@
 import "server-only";
 import type { Confirmacion, EventoConEvidencia, EventoNuevo, Verificacion } from "@/modules/eventos/tipos";
 import { calcularHmac, generarClave } from "@/server/crypto/hmac";
-import { ErrorApi } from "@/server/http/respuestas";
 import { bytesFirmados } from "./firma";
-import { registrarConOutbox } from "./outbox";
+import { registrarConOutbox, revocarConOutbox } from "./outbox";
 import { aEventoAcademico, leerEvento } from "./persistencia-mysql";
-import type { StorageStrategy } from "./tipos";
+import type { SolicitudRevocacion, StorageStrategy } from "./tipos";
 
 /**
  * Línea base BD (ADR-017, RQ3): exactamente el mismo trabajo en MySQL que la estrategia B
@@ -22,7 +21,7 @@ export class EstrategiaBD implements StorageStrategy {
       estrategia: "BD",
       nuevo,
       versionEsperada,
-      material: { hmac: calcularHmac(clave, bytes), clave, bytes: bytes.length, temporal: false },
+      material: { hmac: calcularHmac(clave, bytes), clave, bytes: bytes.length, temporal: false, mensaje: null },
       anclar: null,
     });
   }
@@ -43,7 +42,7 @@ export class EstrategiaBD implements StorageStrategy {
     return { eventoId, resultado: "SIN_EVIDENCIA", detalles: ["estrategia BD (línea base): no hay ledger contra el cual verificar"] };
   }
 
-  async revocar(): Promise<Confirmacion> {
-    throw new ErrorApi("NO_DISPONIBLE", "La revocación llega en F7");
+  async revocar(s: SolicitudRevocacion): Promise<Confirmacion> {
+    return revocarConOutbox("BD", s, null);
   }
 }

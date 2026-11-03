@@ -28,6 +28,10 @@ const esquema = z
     FABRIC_CHAINCODE: z.string().default("trazabilidad"),
     FABRIC_COMMIT_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 
+    // Bandeja (F6.3): intentos de anclaje dentro de la solicitud y pausa inicial del backoff exponencial.
+    OUTBOX_MAX_INTENTOS: z.coerce.number().int().min(1).max(10).default(3),
+    OUTBOX_BACKOFF_MS: z.coerce.number().int().min(0).default(200),
+
     EXPERIMENT_STRATEGY: z.enum(["A", "B", "BD"]).default("B"),
     EXPERIMENT_SEED: z.coerce.number().int().default(20261027),
     // `null` = NullLedger (ledger_simulado en MySQL). Solo desarrollo y pruebas.

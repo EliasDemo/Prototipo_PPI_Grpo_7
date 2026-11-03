@@ -16,7 +16,7 @@ if [[ $SI -eq 0 ]]; then
   [[ "$r" =~ ^[sS]$ ]] || exit 0
 fi
 
-TABLAS="medicion muestra_recursos supresion operacion evento_clave evento_detalle evento registro solicitud_idempotente ledger_simulado"
+TABLAS="medicion muestra_recursos supresion revocacion operacion evento_clave evento_detalle evento registro solicitud_idempotente ledger_simulado ledger_simulado_revocacion"
 [[ $TODO -eq 1 ]] && TABLAS="$TABLAS corrida experimento"
 
 {
